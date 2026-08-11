@@ -1,0 +1,6 @@
+export * from '#/infrastructure/auth/db/schema'
+export * from '#/modules/clinic/db/schema'
+export * from '#/modules/order/db/schema'
+export * from '#/modules/appointment/db/schema'
+export * from '#/modules/patient/db/schema'
+export * from '#/modules/client/db/schema'

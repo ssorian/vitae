@@ -1,0 +1,2599 @@
+This file is a merged representation of a subset of the codebase, containing specifically included files, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of a subset of the repository's contents that is considered the most important context.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Only files matching these patterns are included: src/**/*.ts
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+src/
+  app/
+    api/
+      auth/
+        [...all]/
+          route.ts
+      org/
+        orders/
+          [orderId]/
+            result/
+              route.ts
+      portal/
+        results/
+          [orderId]/
+            assets/
+              [assetId]/
+                route.ts
+  config/
+    env.ts
+  infrastructure/
+    auth/
+      db/
+        schema.ts
+      auth-client.ts
+      auth.ts
+      getSession.ts
+      requireOrganization.ts
+      requireUser.ts
+    database/
+      index.ts
+      relations.ts
+      reset.ts
+      schema.ts
+  modules/
+    appointment/
+      db/
+        schema.ts
+      schemas/
+        appointment.ts
+      server/
+        appointment.ts
+        publicAppointment.ts
+      services/
+        appointment.ts
+    client/
+      db/
+        schema.ts
+      schemas/
+        client.ts
+      server/
+        client.ts
+      services/
+        client.ts
+    clinic/
+      db/
+        schema.ts
+      hooks/
+        clinicQueries.ts
+      schemas/
+        clinic.ts
+      server/
+        clinic.ts
+      services/
+        clinic.ts
+    order/
+      db/
+        schema.ts
+      hooks/
+        generalOrder.ts
+      schemas/
+        generalOrder.ts
+      server/
+        generalOrder.ts
+      services/
+        generalOrder.ts
+        results.ts
+    patient/
+      db/
+        schema.ts
+  shared/
+    hooks/
+      use-mobile.ts
+    lib/
+      utils.ts
+  proxy.ts
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="src/app/api/auth/[...all]/route.ts">
+import { auth } from "#/infrastructure/auth/auth";
+import { toNextJsHandler } from "better-auth/next-js";
+
+export const { GET, POST } = toNextJsHandler(auth);
+</file>
+
+<file path="src/app/api/org/orders/[orderId]/result/route.ts">
+import { NextRequest, NextResponse } from 'next/server'
+
+import { requireOrganization } from '#/infrastructure/auth/requireOrganization'
+import { uploadOrderResult } from '#/modules/order/services/results'
+import { appointmentAccess } from '#/modules/appointment/services/appointment'
+
+export const runtime = 'nodejs'
+
+type RouteContext = { params: Promise<{ orderId: string }> }
+
+export async function POST(request: NextRequest, context: RouteContext) {
+  try {
+    const { user, organizationId } = await requireOrganization()
+    const access = await appointmentAccess(organizationId, user.id)
+    if (!['owner', 'assistant'].includes(access.role)) throw new Error('FORBIDDEN')
+    const { orderId } = await context.params
+    const formData = await request.formData()
+    const observations = formData.get('observations')
+    const realizedAt = formData.get('realizedAt')
+    const files = formData.getAll('files').filter((value): value is File => value instanceof File)
+
+    if (typeof observations !== 'string' || typeof realizedAt !== 'string' || Number.isNaN(new Date(realizedAt).getTime())) {
+      return NextResponse.json({ error: 'INVALID_INPUT' }, { status: 400 })
+    }
+
+    await uploadOrderResult(organizationId, user.id, { orderId, observations, realizedAt: new Date(realizedAt), files })
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'RESULT_UPLOAD_FAILED'
+    const status = message === 'UNAUTHORIZED' || message === 'ORGANIZATION_REQUIRED' ? 401 : 400
+    return NextResponse.json({ error: message }, { status })
+  }
+}
+</file>
+
+<file path="src/app/api/portal/results/[orderId]/assets/[assetId]/route.ts">
+import { NextResponse } from 'next/server'
+import { headers } from 'next/headers'
+
+import { auth } from '#/infrastructure/auth/auth'
+import { getDoctorAssetUrl } from '#/modules/order/services/results'
+
+export const runtime = 'nodejs'
+
+type RouteContext = { params: Promise<{ orderId: string; assetId: string }> }
+
+export async function GET(_request: Request, context: RouteContext) {
+  const session = await auth.api.getSession({ headers: await headers() })
+  if (!session) return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 })
+
+  const { orderId, assetId } = await context.params
+  try {
+    const signedUrl = await getDoctorAssetUrl(orderId, assetId, session.user.email)
+    if (!signedUrl) return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 })
+    return NextResponse.json({ signedUrl })
+  } catch {
+    return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 })
+  }
+}
+</file>
+
+<file path="src/config/env.ts">
+import { config } from 'dotenv'
+import { z } from 'zod'
+
+export const serverEnvSchema = z.object({
+  BETTER_AUTH_SECRET: z.string().min(32),
+  BETTER_AUTH_URL: z.url(),
+  DATABASE_URL: z.url(),
+})
+
+function parseServerEnv(input: Record<string, string | undefined>) {
+  return serverEnvSchema.parse(input)
+}
+
+function getEnv() {
+  config({ path: '.env.local' })
+  config({ path: '.env' })
+  return parseServerEnv(process.env)
+}
+
+export const env = getEnv()
+</file>
+
+<file path="src/infrastructure/auth/db/schema.ts">
+import { boolean, pgTable, text, timestamp, uniqueIndex, varchar } from 'drizzle-orm/pg-core'
+
+export const user = pgTable('user', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  email: text('email').notNull().unique(),
+  emailVerified: boolean('email_verified').notNull(),
+  image: text('image'),
+  createdAt: timestamp('created_at').notNull(),
+  updatedAt: timestamp('updated_at').notNull(),
+})
+
+export const organization = pgTable("organization", {
+	id: text("id").primaryKey(),
+	name: text("name").notNull(),
+	slug: varchar("slug", { length: 255 }).notNull().unique(),
+	logo: text("logo"),
+	metadata: text("metadata"),
+	createdAt: timestamp("created_at", { precision: 6, withTimezone: true }).notNull(),
+});
+
+export const member = pgTable("member", {
+	id: text("id").primaryKey(),
+	userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+	organizationId: text("organization_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+	role: text("role").notNull(),
+	createdAt: timestamp("created_at", { precision: 6, withTimezone: true }).notNull(),
+}, (table) => [uniqueIndex('member_id_organization_id_unique').on(table.id, table.organizationId)]);
+
+export const invitation = pgTable("invitation", {
+	id: text("id").primaryKey(),
+	email: text("email").notNull(),
+	inviterId: text("inviter_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+	organizationId: text("organization_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
+	role: text("role"),
+	status: text("status").notNull(),
+	createdAt: timestamp("created_at", { precision: 6, withTimezone: true }).notNull(),
+	expiresAt: timestamp("expires_at", { precision: 6, withTimezone: true }).notNull(),
+});
+
+export const session = pgTable('session', {
+  id: text('id').primaryKey(),
+  expiresAt: timestamp('expires_at').notNull(),
+  token: text('token').notNull().unique(),
+  createdAt: timestamp('created_at').notNull(),
+  updatedAt: timestamp('updated_at').notNull(),
+  ipAddress: text('ip_address'),
+  userAgent: text('user_agent'),
+  userId: text('user_id')
+    .notNull()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  activeOrganizationId: text("active_organization_id"),
+})
+
+export const account = pgTable('account', {
+  id: text('id').primaryKey(),
+  accountId: text('account_id').notNull(),
+  providerId: text('provider_id').notNull(),
+  userId: text('user_id')
+    .notNull()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  accessToken: text('access_token'),
+  refreshToken: text('refresh_token'),
+  idToken: text('id_token'),
+  accessTokenExpiresAt: timestamp('access_token_expires_at'),
+  refreshTokenExpiresAt: timestamp('refresh_token_expires_at'),
+  scope: text('scope'),
+  password: text('password'),
+  createdAt: timestamp('created_at').notNull(),
+  updatedAt: timestamp('updated_at').notNull(),
+})
+
+export const verification = pgTable('verification', {
+  id: text('id').primaryKey(),
+  identifier: text('identifier').notNull(),
+  value: text('value').notNull(),
+  expiresAt: timestamp('expires_at').notNull(),
+  createdAt: timestamp('created_at'),
+  updatedAt: timestamp('updated_at'),
+})
+</file>
+
+<file path="src/infrastructure/auth/auth-client.ts">
+import { createAuthClient } from 'better-auth/react'
+import {organizationClient} from 'better-auth/client/plugins'
+
+export const authClient = createAuthClient({plugins: [organizationClient()]})
+</file>
+
+<file path="src/infrastructure/auth/auth.ts">
+import { betterAuth } from 'better-auth'
+import { organization } from 'better-auth/plugins'
+import { drizzleAdapter } from 'better-auth/adapters/drizzle'
+
+import { env } from '#/config/env'
+import { db } from '#/infrastructure/database/index'
+
+import * as schema from './db/schema'
+
+export function organizationSlug(name: string) {
+  const base =
+    name
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 240) || 'clinic'
+
+  return `${base}-${crypto.randomUUID().slice(0, 8)}`
+}
+
+let createOrganizationForUser: (user: {
+  id: string
+  name: string
+}) => Promise<void> = async () => {
+  throw new Error('Organization creation is not initialized')
+}
+
+export const auth = betterAuth({
+  secret: env.BETTER_AUTH_SECRET,
+  baseURL: env.BETTER_AUTH_URL,
+  database: drizzleAdapter(db, {
+    provider: 'pg',
+    schema,
+  }),
+  emailAndPassword: {
+    enabled: true,
+  },
+  databaseHooks: {
+    user: {
+      create: {
+        after: async (user) => createOrganizationForUser(user),
+      },
+    },
+  },
+  plugins: [organization()],
+})
+
+createOrganizationForUser = async (user) => {
+  await auth.api.createOrganization({
+    body: {
+      name: `${user.name.trim() || 'Clinic'} Clinic`,
+      slug: organizationSlug(user.name),
+      userId: user.id,
+    },
+  })
+}
+</file>
+
+<file path="src/infrastructure/auth/getSession.ts">
+import 'server-only'
+
+import { cache } from 'react'
+import { headers } from 'next/headers'
+import { redirect } from 'next/navigation'
+
+import { auth } from './auth'
+
+export const getSession = cache(async () => {
+  return auth.api.getSession({
+    headers: await headers(),
+  })
+})
+
+export const requireSession = cache(async () => {
+  const session = await getSession()
+
+  if (!session) {
+    redirect('/login')
+  }
+
+  return session
+})
+</file>
+
+<file path="src/infrastructure/auth/requireOrganization.ts">
+// src/infrastructure/auth/requireOrganization.ts
+
+import { headers } from 'next/headers'
+
+import { auth } from '#/infrastructure/auth/auth'
+
+export async function requireOrganization() {
+  const session = await initializeActiveOrganization()
+
+  if (!session) {
+    throw new Error('UNAUTHORIZED')
+  }
+
+  const organizationId = session.session.activeOrganizationId
+
+  if (!organizationId) {
+    throw new Error('ORGANIZATION_REQUIRED')
+  }
+
+  return {
+    user: session.user,
+    session: session.session,
+    organizationId,
+  }
+}
+
+export async function initializeActiveOrganization() {
+  const requestHeaders = await headers()
+
+  const session = await auth.api.getSession({
+    headers: requestHeaders,
+  })
+
+  if (!session) {
+    return null
+  }
+
+  if (session.session.activeOrganizationId) {
+    return session
+  }
+
+  const organizations = await auth.api.listOrganizations({
+    headers: requestHeaders,
+  })
+
+  // Si tu modelo permite múltiples organizaciones,
+  // aquí NO deberías seleccionar arbitrariamente una.
+  if (organizations.length !== 1) {
+    return session
+  }
+
+  await auth.api.setActiveOrganization({
+    headers: requestHeaders,
+    body: {
+      organizationId: organizations[0].id,
+    },
+  })
+
+  return {
+    ...session,
+    session: {
+      ...session.session,
+      activeOrganizationId: organizations[0].id,
+    },
+  }
+}
+</file>
+
+<file path="src/infrastructure/auth/requireUser.ts">
+import 'server-only'
+
+import { headers } from 'next/headers'
+
+import { auth } from '#/infrastructure/auth/auth'
+
+export async function requireUser() {
+  const session = await auth.api.getSession({
+    headers: await headers(),
+  })
+
+  if (!session?.user) {
+    throw new Error('UNAUTHORIZED')
+  }
+
+  return session.user
+}
+</file>
+
+<file path="src/infrastructure/database/index.ts">
+import { env } from '#/config/env'
+
+import { drizzle } from 'drizzle-orm/node-postgres'
+import { Pool } from 'pg'
+import { relations } from './relations'
+
+const pool = new Pool({
+  connectionString: env.DATABASE_URL,
+})
+
+export const db = drizzle({
+  client: pool,
+  relations,
+})
+</file>
+
+<file path="src/infrastructure/database/relations.ts">
+import { defineRelations } from 'drizzle-orm'
+
+import {
+  account,
+  invitation,
+  member,
+  organization,
+  session,
+  user,
+  verification,
+} from '#/infrastructure/auth/db/schema'
+import { doctorClient } from '#/modules/client/db/schema'
+import { clinic } from '#/modules/clinic/db/schema'
+import {
+  order,
+  orderAsset,
+  orderEvent,
+  orderResult,
+} from '#/modules/order/db/schema'
+import {
+  patient,
+  patientHistory,
+} from '#/modules/patient/db/schema'
+
+export const relations = defineRelations(
+  {
+    account,
+    clinic,
+    doctorClient,
+    invitation,
+    member,
+    order,
+    orderAsset,
+    orderEvent,
+    orderResult,
+    organization,
+    patient,
+    patientHistory,
+    session,
+    user,
+    verification,
+  },
+  (t) => ({
+    doctorClient: {
+      orders: t.many.order({
+        from: t.doctorClient.id,
+        to: t.order.doctorClientId,
+      }),
+    },
+    order: {
+      doctorClient: t.one.doctorClient({
+        from: t.order.doctorClientId,
+        to: t.doctorClient.id,
+        optional: false,
+      }),
+      patientHistory: t.one.patientHistory({
+        from: t.order.patientHistoryId,
+        to: t.patientHistory.id,
+      }),
+      clinic: t.one.clinic({
+        from: t.order.clinicId,
+        to: t.clinic.id,
+      }),
+      createdBy: t.one.user({
+        from: t.order.createdByUserId,
+        to: t.user.id,
+      }),
+      results: t.many.orderResult({
+        from: t.order.id,
+        to: t.orderResult.orderId,
+      }),
+      assets: t.many.orderAsset({
+        from: t.order.id,
+        to: t.orderAsset.orderId,
+      }),
+      events: t.many.orderEvent({
+        from: t.order.id,
+        to: t.orderEvent.orderId,
+      }),
+    },
+    orderResult: {
+      order: t.one.order({
+        from: t.orderResult.orderId,
+        to: t.order.id,
+      }),
+      finalizedBy: t.one.user({
+        from: t.orderResult.finalizedByUserId,
+        to: t.user.id,
+      }),
+    },
+    orderAsset: {
+      order: t.one.order({
+        from: t.orderAsset.orderId,
+        to: t.order.id,
+      }),
+    },
+    orderEvent: {
+      order: t.one.order({
+        from: t.orderEvent.orderId,
+        to: t.order.id,
+      }),
+      user: t.one.user({
+        from: t.orderEvent.userId,
+        to: t.user.id,
+      }),
+    },
+    patient: {
+      history: t.one.patientHistory({
+        from: t.patient.id,
+        to: t.patientHistory.patientId,
+      }),
+    },
+    patientHistory: {
+      patient: t.one.patient({
+        from: t.patientHistory.patientId,
+        to: t.patient.id,
+      }),
+      orders: t.many.order({
+        from: t.patientHistory.id,
+        to: t.order.patientHistoryId,
+      }),
+    },
+  }),
+)
+</file>
+
+<file path="src/infrastructure/database/reset.ts">
+import 'dotenv/config'
+import { sql } from 'drizzle-orm'
+import { db } from './index'
+
+type QueryResult<T> = { rows: T[] }
+
+async function resetDatabase() {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('No se puede resetear la base de datos en producción')
+  }
+
+  await db.execute(sql.raw('DROP SCHEMA public CASCADE'))
+  await db.execute(sql.raw('CREATE SCHEMA public'))
+
+  const privileges = (await db.execute(sql`
+    SELECT
+      has_schema_privilege(current_user, 'public', 'USAGE')
+      AND has_schema_privilege(current_user, 'public', 'CREATE') AS "hasPrivileges"
+  `)) as QueryResult<{ hasPrivileges: boolean }>
+
+  if (!privileges.rows[0]?.hasPrivileges) {
+    await db.execute(sql.raw('GRANT USAGE, CREATE ON SCHEMA public TO CURRENT_USER'))
+  }
+
+  console.log('Base de datos limpiada correctamente')
+}
+
+resetDatabase().catch((error) => {
+  console.error('Error al limpiar la base de datos:', error)
+  process.exitCode = 1
+})
+</file>
+
+<file path="src/infrastructure/database/schema.ts">
+export * from '#/infrastructure/auth/db/schema'
+export * from '#/modules/clinic/db/schema'
+export * from '#/modules/order/db/schema'
+export * from '#/modules/appointment/db/schema'
+export * from '#/modules/patient/db/schema'
+export * from '#/modules/client/db/schema'
+</file>
+
+<file path="src/modules/appointment/db/schema.ts">
+import { sql } from 'drizzle-orm'
+import { boolean, index, integer, jsonb, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core'
+
+import { organization, member, user } from '#/infrastructure/auth/db/schema'
+import { clinic } from '#/modules/clinic/db/schema'
+import { patient } from '#/modules/patient/db/schema'
+import { order } from '#/modules/order/db/schema'
+
+export const calendarResourceType = pgEnum('calendar_resource_type', ['dentist', 'equipment', 'room', 'chair', 'other'])
+export const calendarResourceStatus = pgEnum('calendar_resource_status', ['active', 'inactive'])
+export const appointmentKind = pgEnum('appointment_kind', ['clinical', 'study'])
+export const appointmentSource = pgEnum('appointment_source', ['internal', 'whatsapp', 'public_order'])
+export const appointmentStatus = pgEnum('appointment_status', ['requested', 'scheduled', 'checked_in', 'in_progress', 'completed', 'cancelled', 'rejected', 'no_show'])
+export const appointmentEventType = pgEnum('appointment_event_type', ['created', 'requested', 'scheduled', 'rescheduled', 'checked_in', 'started', 'completed', 'cancelled', 'rejected', 'no_show'])
+
+export const calendarResource = pgTable('calendar_resource', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  organizationId: text('organization_id').notNull().references(() => organization.id, { onDelete: 'cascade' }),
+  clinicId: uuid('clinic_id').notNull().references(() => clinic.id, { onDelete: 'cascade' }),
+  type: calendarResourceType('type').notNull(),
+  memberId: text('member_id').references(() => member.id, { onDelete: 'set null' }),
+  name: text('name').notNull(),
+  status: calendarResourceStatus('status').notNull().default('active'),
+  isPublicBookingDefault: boolean('is_public_booking_default').notNull().default(false),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index('calendar_resource_organization_clinic_idx').on(t.organizationId, t.clinicId), index('calendar_resource_member_idx').on(t.memberId), uniqueIndex('calendar_resource_public_booking_default_unique').on(t.clinicId).where(sql`${t.isPublicBookingDefault} and ${t.status} = 'active'`)])
+
+export const resourceAvailability = pgTable('resource_availability', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  resourceId: uuid('resource_id').notNull().references(() => calendarResource.id, { onDelete: 'cascade' }),
+  dayOfWeek: integer('day_of_week').notNull(),
+  startTime: text('start_time').notNull(),
+  endTime: text('end_time').notNull(),
+}, (t) => [index('resource_availability_resource_day_idx').on(t.resourceId, t.dayOfWeek)])
+
+export const resourceBlock = pgTable('resource_block', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  resourceId: uuid('resource_id').notNull().references(() => calendarResource.id, { onDelete: 'cascade' }),
+  startsAt: timestamp('starts_at', { withTimezone: true }).notNull(),
+  endsAt: timestamp('ends_at', { withTimezone: true }).notNull(),
+  reason: text('reason'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index('resource_block_resource_time_idx').on(t.resourceId, t.startsAt, t.endsAt)])
+
+export const appointment = pgTable('appointment', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  organizationId: text('organization_id').notNull().references(() => organization.id, { onDelete: 'cascade' }),
+  clinicId: uuid('clinic_id').notNull().references(() => clinic.id, { onDelete: 'cascade' }),
+  patientId: uuid('patient_id').notNull().references(() => patient.id),
+  orderId: uuid('order_id').references(() => order.id),
+  kind: appointmentKind('kind').notNull(),
+  source: appointmentSource('source').notNull().default('internal'),
+  status: appointmentStatus('status').notNull().default('requested'),
+  startsAt: timestamp('starts_at', { withTimezone: true }).notNull(),
+  endsAt: timestamp('ends_at', { withTimezone: true }).notNull(),
+  notes: text('notes'),
+  createdByUserId: text('created_by_user_id').references(() => user.id, { onDelete: 'set null' }),
+  cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index('appointment_organization_clinic_time_idx').on(t.organizationId, t.clinicId, t.startsAt), index('appointment_patient_time_idx').on(t.patientId, t.startsAt), index('appointment_order_idx').on(t.orderId), uniqueIndex('appointment_order_unique').on(t.orderId).where(sql`${t.orderId} is not null and ${t.status} not in ('completed', 'cancelled', 'rejected', 'no_show')`)])
+
+export const appointmentReservation = pgTable('appointment_reservation', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  appointmentId: uuid('appointment_id').notNull().references(() => appointment.id, { onDelete: 'cascade' }),
+  resourceId: uuid('resource_id').notNull().references(() => calendarResource.id, { onDelete: 'cascade' }),
+  startsAt: timestamp('starts_at', { withTimezone: true }).notNull(),
+  endsAt: timestamp('ends_at', { withTimezone: true }).notNull(),
+  active: boolean('active').notNull().default(true),
+}, (t) => [uniqueIndex('appointment_reservation_appointment_resource_unique').on(t.appointmentId, t.resourceId), index('appointment_reservation_resource_time_idx').on(t.resourceId, t.startsAt, t.endsAt)])
+
+export const appointmentEvent = pgTable('appointment_event', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  appointmentId: uuid('appointment_id').notNull().references(() => appointment.id, { onDelete: 'cascade' }),
+  type: appointmentEventType('type').notNull(),
+  userId: text('user_id').references(() => user.id, { onDelete: 'set null' }),
+  metadata: jsonb('metadata').$type<Record<string, unknown>>().notNull().default({}),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [index('appointment_event_appointment_idx').on(t.appointmentId)])
+</file>
+
+<file path="src/modules/appointment/schemas/appointment.ts">
+import { z } from 'zod'
+
+const time = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/)
+const uuid = z.uuid()
+export const resourceInputSchema = z.object({ clinicId: uuid, type: z.enum(['dentist', 'equipment', 'room', 'chair', 'other']), memberId: z.string().min(1).optional().nullable(), name: z.string().trim().min(1).max(120), status: z.enum(['active', 'inactive']).default('active'), isPublicBookingDefault: z.boolean().default(false) })
+export const resourceAvailabilityInputSchema = z.object({ resourceId: uuid, dayOfWeek: z.number().int().min(0).max(6), startTime: time, endTime: time }).refine((v) => v.startTime < v.endTime, 'El horario final debe ser posterior')
+export const resourceBlockInputSchema = z.object({ resourceId: uuid, startsAt: z.coerce.date(), endsAt: z.coerce.date(), reason: z.string().trim().max(500).optional() }).refine((v) => v.startsAt < v.endsAt, 'El bloque debe tener duración positiva')
+export const availabilityInputSchema = z.object({ clinicId: uuid, date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), durationMinutes: z.number().int().positive(), requiredResourceIds: z.array(uuid).min(1) })
+export const appointmentInputSchema = z.object({ clinicId: uuid, patientId: uuid, startsAt: z.coerce.date(), endsAt: z.coerce.date(), resourceIds: z.array(uuid).min(1), notes: z.string().trim().max(2000).optional(), status: z.enum(['requested', 'scheduled']).default('scheduled') }).refine((v) => v.startsAt < v.endsAt, 'La cita debe tener duración positiva')
+export const rescheduleInputSchema = appointmentInputSchema.extend({ id: uuid })
+export const appointmentStatusInputSchema = z.object({ id: uuid, status: z.enum(['requested', 'scheduled', 'checked_in', 'in_progress', 'completed', 'cancelled', 'rejected', 'no_show']) })
+export const scheduleOrderInputSchema = z.object({ orderId: uuid, startsAt: z.coerce.date(), endsAt: z.coerce.date(), resourceIds: z.array(uuid).min(1) }).refine((v) => v.startsAt < v.endsAt, 'La cita debe tener duración positiva')
+
+const publicText = z.string().trim().min(1).max(120)
+export const publicAvailabilityInputSchema = z.object({ clinicPublicSlug: z.string().trim().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).max(160), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) })
+export const publicBookingInputSchema = z.object({ clinicPublicSlug: z.string().trim().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).max(160), startsAt: z.coerce.date(), firstName: publicText, paternalLastName: z.string().trim().max(120).optional(), maternalLastName: z.string().trim().max(120).optional(), phone: z.string().trim().max(40).optional(), email: z.string().trim().email().max(254).optional() }).superRefine((value, context) => { if (!value.phone?.replace(/[^0-9]/g, '') && !value.email) context.addIssue({ code: z.ZodIssueCode.custom, message: 'Se requiere teléfono o correo.' }) })
+</file>
+
+<file path="src/modules/appointment/server/appointment.ts">
+'use server'
+
+import { revalidatePath } from 'next/cache'
+import { requireOrganization } from '#/infrastructure/auth/requireOrganization'
+import { appointmentInputSchema, appointmentStatusInputSchema, availabilityInputSchema, resourceAvailabilityInputSchema, resourceBlockInputSchema, resourceInputSchema, rescheduleInputSchema, scheduleOrderInputSchema } from '../schemas/appointment'
+import { appointmentAccess, createClinicalAppointment, createResource, createResourceBlock, getAvailableSlots, listAgenda, listPatients, listResources, replaceResourceAvailability, rescheduleAppointment, scheduleOrderAppointment, transitionAppointment, updateResource } from '../services/appointment'
+
+async function manager() { const context = await requireOrganization(); const access = await appointmentAccess(context.organizationId, context.user.id); if (!['owner', 'assistant'].includes(access.role)) throw new Error('FORBIDDEN'); return { ...context, access } }
+export async function listPatientsAction() { const { organizationId } = await manager(); return listPatients(organizationId) }
+export async function listResourcesAction(clinicId: string, activeOnly = false) { const { organizationId } = await manager(); return listResources(organizationId, clinicId, activeOnly) }
+export async function createResourceAction(input: unknown) { const data = resourceInputSchema.parse(input); const { organizationId } = await manager(); const result = await createResource(organizationId, data); revalidatePath('/org/appointments'); return result }
+export async function updateResourceAction(id: string, input: unknown) { const data = resourceInputSchema.parse(input); const { organizationId } = await manager(); const result = await updateResource(organizationId, id, data); revalidatePath('/org/appointments'); return result }
+export async function setResourceAvailabilityAction(resourceId: string, input: unknown) { const data = resourceAvailabilityInputSchema.array().parse(input); const { organizationId } = await manager(); await replaceResourceAvailability(organizationId, resourceId, data); revalidatePath('/org/appointments') }
+export async function createResourceBlockAction(input: unknown) { const data = resourceBlockInputSchema.parse(input); const { organizationId } = await manager(); const result = await createResourceBlock(organizationId, data); revalidatePath('/org/appointments'); return result }
+export async function getAvailableSlotsAction(input: unknown) { const data = availabilityInputSchema.parse(input); const { organizationId } = await manager(); return getAvailableSlots(data, organizationId) }
+export async function createAppointmentAction(input: unknown) { const data = appointmentInputSchema.parse(input); const { organizationId, user } = await manager(); const result = await createClinicalAppointment(organizationId, user.id, data); revalidatePath('/org/appointments'); return result }
+export async function rescheduleAppointmentAction(input: unknown) { const data = rescheduleInputSchema.parse(input); const { organizationId, user } = await manager(); const { id, ...slot } = data; const result = await rescheduleAppointment(organizationId, user.id, id, slot); revalidatePath('/org/appointments'); return result }
+export async function transitionAppointmentAction(input: unknown) { const data = appointmentStatusInputSchema.parse(input); const context = await requireOrganization(); const access = await appointmentAccess(context.organizationId, context.user.id); const result = await transitionAppointment(context.organizationId, context.user.id, access.id, access.role, data.id, data.status); revalidatePath('/org/appointments'); revalidatePath('/org/orders'); return result }
+export async function listAgendaAction(clinicId?: string, date?: string) { const context = await requireOrganization(); return listAgenda(context.organizationId, context.user.id, clinicId, date) }
+export async function scheduleOrderAppointmentAction(input: unknown) { const data = scheduleOrderInputSchema.parse(input); const { organizationId, user } = await manager(); const result = await scheduleOrderAppointment(organizationId, user.id, data); revalidatePath('/org/appointments'); revalidatePath(`/org/orders/${data.orderId}`); return result }
+</file>
+
+<file path="src/modules/appointment/server/publicAppointment.ts">
+'use server'
+
+import { publicAvailabilityInputSchema, publicBookingInputSchema } from '../schemas/appointment'
+import { createPublicAppointment, getPublicAvailableSlots, listPublicClinics } from '../services/appointment'
+
+export async function listPublicBookingClinicsAction() {
+  return listPublicClinics()
+}
+
+export async function getPublicAvailabilityAction(input: unknown) {
+  const parsed = publicAvailabilityInputSchema.safeParse(input)
+  if (!parsed.success) return { success: false as const, error: 'BOOKING_UNAVAILABLE' as const }
+  try {
+    return { success: true as const, slots: await getPublicAvailableSlots(parsed.data) }
+  } catch {
+    return { success: false as const, error: 'BOOKING_UNAVAILABLE' as const }
+  }
+}
+
+export async function createPublicAppointmentAction(input: unknown) {
+  const parsed = publicBookingInputSchema.safeParse(input)
+  if (!parsed.success) return { success: false as const, error: 'BOOKING_UNAVAILABLE' as const }
+  return createPublicAppointment(parsed.data)
+}
+</file>
+
+<file path="src/modules/appointment/services/appointment.ts">
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { and, asc, eq, gte, inArray, isNull, lt, or, sql } from 'drizzle-orm'
+import { db } from '#/infrastructure/database'
+import { member } from '#/infrastructure/auth/db/schema'
+import { clinic } from '#/modules/clinic/db/schema'
+import { order, orderEvent } from '#/modules/order/db/schema'
+import { patient, patientHistory } from '#/modules/patient/db/schema'
+import { appointment, appointmentEvent, appointmentReservation, calendarResource, resourceAvailability, resourceBlock } from '../db/schema'
+
+const terminal = ['completed', 'cancelled', 'rejected', 'no_show'] as const
+const inactiveReservationStatus = ['completed', 'cancelled', 'rejected', 'no_show'] as const
+export const SLOT_NOT_AVAILABLE = 'SLOT_NOT_AVAILABLE'
+type SlotInput = { clinicId: string; startsAt: Date; endsAt: Date; resourceIds: string[] }
+
+function parts(date: Date, timezone: string) {
+  const values = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23', weekday: 'short' }).formatToParts(date)
+  return Object.fromEntries(values.filter((p) => p.type !== 'literal').map((p) => [p.type, p.value])) as Record<string, string>
+}
+function overlaps(a: Date, b: Date, c: Date, d: Date) { return a < d && c < b }
+function localDay(date: Date, timezone: string) { const p = parts(date, timezone); return `${p.year}-${p.month}-${p.day}` }
+function weekday(date: Date, timezone: string) { return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(parts(date, timezone).weekday) }
+function aligned(date: Date, timezone: string, interval: number) { return Number(parts(date, timezone).minute) % interval === 0 && date.getSeconds() === 0 && date.getMilliseconds() === 0 }
+
+async function verifiedResources(tx: any, organizationId: string, slot: SlotInput) {
+  const resources = await tx.select().from(calendarResource).where(and(eq(calendarResource.organizationId, organizationId), eq(calendarResource.clinicId, slot.clinicId), eq(calendarResource.status, 'active'), inArray(calendarResource.id, slot.resourceIds)))
+  if (resources.length !== new Set(slot.resourceIds).size) throw new Error(SLOT_NOT_AVAILABLE)
+  return resources
+}
+async function slotIsAvailable(tx: any, organizationId: string, slot: SlotInput, excludeAppointmentId?: string) {
+  const [currentClinic] = await tx.select().from(clinic).where(and(eq(clinic.id, slot.clinicId), eq(clinic.organizationId, organizationId)))
+  if (!currentClinic || slot.startsAt >= slot.endsAt || !aligned(slot.startsAt, currentClinic.timezone, currentClinic.slotIntervalMinutes) || !aligned(slot.endsAt, currentClinic.timezone, currentClinic.slotIntervalMinutes)) throw new Error(SLOT_NOT_AVAILABLE)
+  await tx.execute(sql`SELECT id FROM calendar_resource WHERE id IN ${slot.resourceIds} FOR UPDATE`)
+  await verifiedResources(tx, organizationId, slot)
+  const availability = await tx.select().from(resourceAvailability).where(inArray(resourceAvailability.resourceId, slot.resourceIds))
+  const day = weekday(slot.startsAt, currentClinic.timezone)
+  for (const id of slot.resourceIds) {
+    const range = availability.filter((v: any) => v.resourceId === id && v.dayOfWeek === day)
+    const start = parts(slot.startsAt, currentClinic.timezone).hour + ':' + parts(slot.startsAt, currentClinic.timezone).minute
+    const end = parts(slot.endsAt, currentClinic.timezone).hour + ':' + parts(slot.endsAt, currentClinic.timezone).minute
+    if (!range.some((v: any) => v.startTime <= start && v.endTime >= end)) throw new Error(SLOT_NOT_AVAILABLE)
+  }
+  const blocks = await tx.select().from(resourceBlock).where(and(inArray(resourceBlock.resourceId, slot.resourceIds), lt(resourceBlock.startsAt, slot.endsAt), gte(resourceBlock.endsAt, slot.startsAt)))
+  if (blocks.some((b: any) => overlaps(b.startsAt, b.endsAt, slot.startsAt, slot.endsAt))) throw new Error(SLOT_NOT_AVAILABLE)
+  const reservations = await tx.select().from(appointmentReservation).where(and(inArray(appointmentReservation.resourceId, slot.resourceIds), eq(appointmentReservation.active, true), lt(appointmentReservation.startsAt, slot.endsAt), gte(appointmentReservation.endsAt, slot.startsAt)))
+  if (reservations.some((r: any) => r.appointmentId !== excludeAppointmentId && overlaps(r.startsAt, r.endsAt, slot.startsAt, slot.endsAt))) throw new Error(SLOT_NOT_AVAILABLE)
+  return currentClinic
+}
+
+export async function getAvailableSlots(input: { clinicId: string; date: string; durationMinutes: number; requiredResourceIds: string[] }, organizationId: string) {
+  if (input.durationMinutes <= 0) throw new Error('INVALID_DURATION')
+  const [currentClinic] = await db.select().from(clinic).where(and(eq(clinic.id, input.clinicId), eq(clinic.organizationId, organizationId)))
+  if (!currentClinic) throw new Error('CLINIC_NOT_FOUND')
+  const start = new Date(`${input.date}T00:00:00Z`); const candidates: Date[] = []
+  for (let ms = start.getTime() - 14 * 3600000; ms < start.getTime() + 38 * 3600000; ms += currentClinic.slotIntervalMinutes * 60000) { const candidate = new Date(ms); if (localDay(candidate, currentClinic.timezone) === input.date && aligned(candidate, currentClinic.timezone, currentClinic.slotIntervalMinutes)) candidates.push(candidate) }
+  const result = [] as { startsAt: Date; endsAt: Date }[]
+  for (const startsAt of candidates) { const endsAt = new Date(startsAt.getTime() + input.durationMinutes * 60000); if (localDay(endsAt, currentClinic.timezone) !== input.date) continue; try { await slotIsAvailable(db, organizationId, { clinicId: input.clinicId, startsAt, endsAt, resourceIds: input.requiredResourceIds }); result.push({ startsAt, endsAt }) } catch (error) { if (!(error instanceof Error) || error.message !== SLOT_NOT_AVAILABLE) throw error } }
+  return result
+}
+
+async function createInTx(tx: any, organizationId: string, userId: string, data: SlotInput & { patientId: string; kind: 'clinical' | 'study'; source: 'internal' | 'whatsapp' | 'public_order'; notes?: string; status: 'requested' | 'scheduled'; orderId?: string | null }, event: 'created' | 'requested' | 'scheduled' = 'created') {
+  await slotIsAvailable(tx, organizationId, data)
+  const [currentPatient] = await tx.select().from(patient).where(and(eq(patient.id, data.patientId), eq(patient.organizationId, organizationId)))
+  if (!currentPatient) throw new Error('PATIENT_NOT_FOUND')
+  const [created] = await tx.insert(appointment).values({ organizationId, clinicId: data.clinicId, patientId: data.patientId, orderId: data.orderId ?? null, kind: data.kind, source: data.source, status: data.status, startsAt: data.startsAt, endsAt: data.endsAt, notes: data.notes, createdByUserId: userId }).returning()
+  await tx.insert(appointmentReservation).values(data.resourceIds.map((resourceId) => ({ appointmentId: created.id, resourceId, startsAt: data.startsAt, endsAt: data.endsAt })))
+  await tx.insert(appointmentEvent).values({ appointmentId: created.id, type: 'created', userId, metadata: {} })
+  if (event !== 'created') await tx.insert(appointmentEvent).values({ appointmentId: created.id, type: event, userId, metadata: {} })
+  return created
+}
+export function createClinicalAppointment(organizationId: string, userId: string, data: SlotInput & { patientId: string; notes?: string; status: 'requested' | 'scheduled' }) { return db.transaction((tx) => createInTx(tx, organizationId, userId, { ...data, kind: 'clinical', source: 'internal' }, data.status === 'requested' ? 'requested' : 'scheduled')) }
+export async function rescheduleAppointment(organizationId: string, userId: string, id: string, data: SlotInput & { patientId: string; notes?: string; status: 'requested' | 'scheduled' }) { return db.transaction(async (tx) => { const [existing] = await tx.select().from(appointment).where(and(eq(appointment.id, id), eq(appointment.organizationId, organizationId))); if (!existing || terminal.includes(existing.status as any)) throw new Error(SLOT_NOT_AVAILABLE); await slotIsAvailable(tx, organizationId, data, id); const [currentPatient] = await tx.select().from(patient).where(and(eq(patient.id, data.patientId), eq(patient.organizationId, organizationId))); if (!currentPatient) throw new Error('PATIENT_NOT_FOUND'); await tx.update(appointmentReservation).set({ active: false }).where(eq(appointmentReservation.appointmentId, id)); await tx.insert(appointmentReservation).values(data.resourceIds.map((resourceId) => ({ appointmentId: id, resourceId, startsAt: data.startsAt, endsAt: data.endsAt }))); const [updated] = await tx.update(appointment).set({ ...data, startsAt: data.startsAt, endsAt: data.endsAt, updatedAt: new Date() }).where(eq(appointment.id, id)).returning(); await tx.insert(appointmentEvent).values({ appointmentId: id, type: 'rescheduled', userId, metadata: {} }); return updated }) }
+
+export async function scheduleOrderAppointment(organizationId: string, userId: string, data: Omit<SlotInput, 'clinicId'> & { orderId: string }) { return db.transaction(async (tx) => { const [currentOrder] = await tx.select().from(order).where(and(eq(order.id, data.orderId), eq(order.organizationId, organizationId))); if (!currentOrder || currentOrder.status !== 'received') throw new Error('ORDER_NOT_ELIGIBLE'); const [history] = await tx.select().from(patientHistory).where(eq(patientHistory.id, currentOrder.patientHistoryId)); if (!history) throw new Error('ORDER_NOT_FOUND'); const created = await createInTx(tx, organizationId, userId, { ...data, clinicId: currentOrder.clinicId, patientId: history.patientId, kind: 'study', source: currentOrder.source === 'public' ? 'public_order' : 'internal', status: 'scheduled', orderId: currentOrder.id }, 'scheduled'); await tx.update(order).set({ status: 'scheduled', updatedAt: new Date() }).where(eq(order.id, currentOrder.id)); await tx.insert(orderEvent).values({ orderId: currentOrder.id, type: 'order.scheduled', userId, metadata: { appointmentId: created.id } }); return created }) }
+
+export async function transitionAppointment(organizationId: string, userId: string, memberId: string, role: string, id: string, status: 'requested' | 'scheduled' | 'checked_in' | 'in_progress' | 'completed' | 'cancelled' | 'rejected' | 'no_show') { return db.transaction(async (tx) => { const [current] = await tx.select().from(appointment).where(and(eq(appointment.id, id), eq(appointment.organizationId, organizationId))); if (!current) throw new Error('APPOINTMENT_NOT_FOUND'); if (role === 'dentist') { if (!['in_progress', 'completed'].includes(status)) throw new Error('FORBIDDEN'); const assigned = await tx.select().from(appointmentReservation).innerJoin(calendarResource, eq(appointmentReservation.resourceId, calendarResource.id)).where(and(eq(appointmentReservation.appointmentId, id), eq(calendarResource.type, 'dentist'), eq(calendarResource.memberId, memberId))); if (!assigned.length) throw new Error('FORBIDDEN') } else if (!['owner', 'assistant'].includes(role)) throw new Error('FORBIDDEN'); const [updated] = await tx.update(appointment).set({ status, cancelledAt: status === 'cancelled' ? new Date() : current.cancelledAt, updatedAt: new Date() }).where(eq(appointment.id, id)).returning(); if (inactiveReservationStatus.includes(status as any)) await tx.update(appointmentReservation).set({ active: false }).where(eq(appointmentReservation.appointmentId, id)); await tx.insert(appointmentEvent).values({ appointmentId: id, type: status === 'in_progress' ? 'started' : status, userId, metadata: {} }); if (current.orderId && status === 'in_progress') { await tx.update(order).set({ status: 'in_progress', updatedAt: new Date() }).where(and(eq(order.id, current.orderId), eq(order.status, 'scheduled'))); await tx.insert(orderEvent).values({ orderId: current.orderId, type: 'order.started', userId, metadata: { appointmentId: id } }) } if (current.orderId && status === 'cancelled') { await tx.update(order).set({ status: 'received', updatedAt: new Date() }).where(and(eq(order.id, current.orderId), or(eq(order.status, 'scheduled'), eq(order.status, 'in_progress')))) } return updated }) }
+
+export async function appointmentAccess(organizationId: string, userId: string) { const [current] = await db.select().from(member).where(and(eq(member.organizationId, organizationId), eq(member.userId, userId))); if (!current) throw new Error('FORBIDDEN'); return current }
+export async function listAgenda(organizationId: string, userId: string, clinicId?: string, date?: string) {
+  const access = await appointmentAccess(organizationId, userId)
+  const agendaClinics = date ? await db.select({ id: clinic.id, timezone: clinic.timezone }).from(clinic).where(and(eq(clinic.organizationId, organizationId), clinicId ? eq(clinic.id, clinicId) : undefined)) : []
+  if (date && !agendaClinics.length) return []
+  const localDay = date ? or(...agendaClinics.map((currentClinic) => and(eq(appointment.clinicId, currentClinic.id), gte(appointment.startsAt, sql`(${date}::date::timestamp AT TIME ZONE ${currentClinic.timezone})`), lt(appointment.startsAt, sql`((${date}::date + 1)::timestamp AT TIME ZONE ${currentClinic.timezone})`)))) : undefined
+  const rows = await db.select().from(appointment).where(and(eq(appointment.organizationId, organizationId), clinicId ? eq(appointment.clinicId, clinicId) : undefined, localDay)).orderBy(asc(appointment.startsAt))
+  if (access.role !== 'dentist') { if (!['owner', 'assistant'].includes(access.role)) throw new Error('FORBIDDEN'); return rows }
+  const reserved = await db.select().from(appointmentReservation).innerJoin(calendarResource, eq(appointmentReservation.resourceId, calendarResource.id)).where(and(eq(calendarResource.memberId, access.id), eq(calendarResource.type, 'dentist')))
+  const ids = new Set(reserved.map((r: any) => r.appointment_reservation.appointmentId)); return rows.filter((row) => ids.has(row.id))
+}
+
+async function verifyResourceLinks(tx: any, organizationId: string, input: { clinicId: string; memberId?: string | null }) {
+  const [currentClinic] = await tx.select().from(clinic).where(and(eq(clinic.id, input.clinicId), eq(clinic.organizationId, organizationId)))
+  if (!currentClinic) throw new Error('CLINIC_NOT_FOUND')
+  if (input.memberId) {
+    const [currentMember] = await tx.select().from(member).where(and(eq(member.id, input.memberId), eq(member.organizationId, organizationId)))
+    if (!currentMember) throw new Error('MEMBER_NOT_FOUND')
+  }
+}
+export async function listPatients(organizationId: string) { return db.select({ id: patient.id, firstName: patient.firstName, paternalLastName: patient.paternalLastName, maternalLastName: patient.maternalLastName }).from(patient).where(eq(patient.organizationId, organizationId)).orderBy(asc(patient.firstName), asc(patient.paternalLastName), asc(patient.maternalLastName)) }
+export async function listResources(organizationId: string, clinicId: string, activeOnly = false) { return db.select().from(calendarResource).where(and(eq(calendarResource.organizationId, organizationId), eq(calendarResource.clinicId, clinicId), activeOnly ? eq(calendarResource.status, 'active') : undefined)).orderBy(asc(calendarResource.name)) }
+export async function createResource(organizationId: string, input: any) { return db.transaction(async (tx) => { await verifyResourceLinks(tx, organizationId, input); if (input.isPublicBookingDefault && input.status === 'active') await tx.update(calendarResource).set({ isPublicBookingDefault: false, updatedAt: new Date() }).where(and(eq(calendarResource.organizationId, organizationId), eq(calendarResource.clinicId, input.clinicId), eq(calendarResource.isPublicBookingDefault, true))); const [created] = await tx.insert(calendarResource).values({ ...input, organizationId }).returning(); return created }) }
+export async function updateResource(organizationId: string, id: string, input: any) { return db.transaction(async (tx) => { await verifyResourceLinks(tx, organizationId, input); if (input.isPublicBookingDefault && input.status === 'active') await tx.update(calendarResource).set({ isPublicBookingDefault: false, updatedAt: new Date() }).where(and(eq(calendarResource.organizationId, organizationId), eq(calendarResource.clinicId, input.clinicId), eq(calendarResource.isPublicBookingDefault, true))); const [updated] = await tx.update(calendarResource).set({ ...input, updatedAt: new Date() }).where(and(eq(calendarResource.id, id), eq(calendarResource.organizationId, organizationId))).returning(); return updated }) }
+export async function replaceResourceAvailability(organizationId: string, resourceId: string, values: any[]) { const resources = await db.select().from(calendarResource).where(and(eq(calendarResource.id, resourceId), eq(calendarResource.organizationId, organizationId))); if (!resources.length) throw new Error('RESOURCE_NOT_FOUND'); return db.transaction(async (tx) => { await tx.delete(resourceAvailability).where(eq(resourceAvailability.resourceId, resourceId)); if (values.length) await tx.insert(resourceAvailability).values(values.map((value) => ({ ...value, resourceId }))) }) }
+export async function createResourceBlock(organizationId: string, input: any) { const resources = await db.select().from(calendarResource).where(and(eq(calendarResource.id, input.resourceId), eq(calendarResource.organizationId, organizationId))); if (!resources.length) throw new Error('RESOURCE_NOT_FOUND'); const [created] = await db.insert(resourceBlock).values(input).returning(); return created }
+
+export async function listPublicClinics() { return db.select({ publicSlug: clinic.publicSlug, name: clinic.name, addressLine: clinic.addressLine, phone: clinic.phone }).from(clinic).where(and(eq(clinic.status, 'active'), isNull(clinic.archivedAt))).orderBy(asc(clinic.name)) }
+
+async function publicClinic(tx: any, publicSlug: string) { const [current] = await tx.select().from(clinic).where(and(eq(clinic.publicSlug, publicSlug), eq(clinic.status, 'active'), isNull(clinic.archivedAt))); if (!current) throw new Error('BOOKING_UNAVAILABLE'); return current }
+async function publicResource(tx: any, currentClinic: any) { const [resource] = await tx.select().from(calendarResource).where(and(eq(calendarResource.clinicId, currentClinic.id), eq(calendarResource.organizationId, currentClinic.organizationId), eq(calendarResource.status, 'active'), eq(calendarResource.isPublicBookingDefault, true))); if (!resource) throw new Error('BOOKING_UNAVAILABLE'); return resource }
+function publicRange(date: string, timezone: string, interval: number) { const start = new Date(`${date}T00:00:00Z`); return Array.from({ length: Math.ceil((52 * 60) / interval) }, (_, index) => new Date(start.getTime() - 14 * 3600000 + index * interval * 60000)).filter((value) => localDay(value, timezone) === date) }
+
+export async function getPublicAvailableSlots(input: { clinicPublicSlug: string; date: string }) { const currentClinic = await publicClinic(db, input.clinicPublicSlug); const resource = await publicResource(db, currentClinic); const now = new Date(); const latest = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); const result: { startsAt: Date; endsAt: Date }[] = []; for (const startsAt of publicRange(input.date, currentClinic.timezone, currentClinic.slotIntervalMinutes)) { const endsAt = new Date(startsAt.getTime() + 30 * 60 * 1000); if (startsAt <= now || startsAt > latest || localDay(endsAt, currentClinic.timezone) !== input.date) continue; try { await slotIsAvailable(db, currentClinic.organizationId, { clinicId: currentClinic.id, startsAt, endsAt, resourceIds: [resource.id] }); result.push({ startsAt, endsAt }) } catch (error) { if (!(error instanceof Error) || ![SLOT_NOT_AVAILABLE, 'BOOKING_UNAVAILABLE'].includes(error.message)) throw error } } return result }
+
+function normalizedPhone(value?: string) { const normalized = value?.replace(/\D/g, ''); return normalized || null }
+export async function createPublicAppointment(input: { clinicPublicSlug: string; startsAt: Date; firstName: string; paternalLastName?: string; maternalLastName?: string; phone?: string; email?: string }) { try { return await db.transaction(async (tx) => { const currentClinic = await publicClinic(tx, input.clinicPublicSlug); const resource = await publicResource(tx, currentClinic); const endsAt = new Date(input.startsAt.getTime() + 30 * 60 * 1000); const now = new Date(); const latest = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); if (input.startsAt <= now || input.startsAt > latest) throw new Error(SLOT_NOT_AVAILABLE); await slotIsAvailable(tx, currentClinic.organizationId, { clinicId: currentClinic.id, startsAt: input.startsAt, endsAt, resourceIds: [resource.id] }); if ((await publicResource(tx, currentClinic)).id !== resource.id) throw new Error(SLOT_NOT_AVAILABLE); const email = input.email?.trim().toLowerCase() || null; const phone = normalizedPhone(input.phone); const contact = or(email ? sql`lower(${patient.email}) = ${email}` : undefined, phone ? sql`regexp_replace(${patient.phone}, '[^0-9]', '', 'g') = ${phone}` : undefined); const [existing] = await tx.select().from(patient).where(and(eq(patient.organizationId, currentClinic.organizationId), contact)); const patientRecord = existing ?? (await tx.insert(patient).values({ organizationId: currentClinic.organizationId, firstName: input.firstName.trim(), paternalLastName: input.paternalLastName?.trim() || null, maternalLastName: input.maternalLastName?.trim() || null, email, phone }).returning())[0]; const duplicate = await tx.select({ id: appointment.id }).from(appointment).where(and(eq(appointment.organizationId, currentClinic.organizationId), eq(appointment.clinicId, currentClinic.id), eq(appointment.patientId, patientRecord.id), eq(appointment.startsAt, input.startsAt), sql`${appointment.status} not in ('completed', 'cancelled', 'rejected', 'no_show')`)); if (duplicate.length) throw new Error(SLOT_NOT_AVAILABLE); const [created] = await tx.insert(appointment).values({ organizationId: currentClinic.organizationId, clinicId: currentClinic.id, patientId: patientRecord.id, kind: 'clinical', source: 'public_order', status: 'scheduled', startsAt: input.startsAt, endsAt, createdByUserId: null }).returning(); await tx.insert(appointmentReservation).values({ appointmentId: created.id, resourceId: resource.id, startsAt: input.startsAt, endsAt }); await tx.insert(appointmentEvent).values({ appointmentId: created.id, type: 'scheduled', userId: null, metadata: { source: 'public_booking' } }); return { success: true as const } }) } catch (error) { if (error instanceof Error && error.message === SLOT_NOT_AVAILABLE) return { success: false as const, error: SLOT_NOT_AVAILABLE }; return { success: false as const, error: 'BOOKING_UNAVAILABLE' as const } } }
+</file>
+
+<file path="src/modules/client/db/schema.ts">
+import { organization, user } from '#/infrastructure/auth/db/schema'
+import { index, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core"
+
+export const doctorClientStatus = pgEnum(
+  'doctor_client_status',
+  [
+    'active',
+    'inactive',
+  ],
+)
+
+export const doctorClient = pgTable(
+  'doctor_client',
+  {
+    id: uuid('id')
+      .defaultRandom()
+      .primaryKey(),
+
+    organizationId: text('organization_id')
+      .notNull()
+      .references(() => organization.id, {
+        onDelete: 'cascade',
+      }),
+
+    /**
+     * Nullable hasta que el doctor cree/vincule su cuenta.
+     */
+    userId: text('user_id')
+      .references(() => user.id, {
+        onDelete: 'set null',
+      }),
+
+    firstName: text('first_name')
+      .notNull(),
+
+    paternalLastName: text('paternal_last_name')
+      .notNull(),
+
+    maternalLastName: text('maternal_last_name'),
+
+    professionalLicense: text('professional_license'),
+
+    specialty: text('specialty'),
+
+    clinicName: text('clinic_name'),
+
+    phone: text('phone'),
+
+    email: text('email')
+      .notNull(),
+
+    status: doctorClientStatus('status')
+      .default('active')
+      .notNull(),
+
+    createdAt: timestamp('created_at', {
+      withTimezone: true,
+    })
+      .defaultNow()
+      .notNull(),
+
+    updatedAt: timestamp('updated_at', {
+      withTimezone: true,
+    })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index('doctor_client_organization_idx')
+      .on(table.organizationId),
+
+    uniqueIndex('doctor_client_org_user_unique')
+      .on(
+        table.organizationId,
+        table.userId,
+      ),
+
+    uniqueIndex('doctor_client_org_email_unique')
+      .on(
+        table.organizationId,
+        table.email,
+      ),
+  ],
+)
+</file>
+
+<file path="src/modules/client/schemas/client.ts">
+// src/modules/client/schemas/client-onboarding.schema.ts
+
+import { z } from 'zod'
+
+const optionalText = (max: number) =>
+  z
+    .string()
+    .trim()
+    .max(max)
+    .transform((value) => value || undefined)
+    .optional()
+
+export const clientOnboardingSchema = z.object({
+  firstName: z
+    .string()
+    .trim()
+    .min(1, 'El nombre es obligatorio')
+    .max(100),
+
+  paternalLastName: z
+    .string()
+    .trim()
+    .min(1, 'El apellido paterno es obligatorio')
+    .max(100),
+
+  maternalLastName: optionalText(100),
+
+  professionalLicense: optionalText(50),
+
+  specialty: optionalText(100),
+
+  clinicName: optionalText(150),
+
+  phone: optionalText(30),
+})
+
+export type ClientOnboardingInput =
+  z.infer<typeof clientOnboardingSchema>
+</file>
+
+<file path="src/modules/client/server/client.ts">
+// src/modules/client/server/client.service.ts
+
+import { db } from '#/infrastructure/database'
+import { organization } from '#/infrastructure/auth/db/schema'
+
+export async function getPlatformOrganization() {
+  const organizations = await db
+    .select({
+      id: organization.id,
+    })
+    .from(organization)
+    .limit(2)
+
+  if (organizations.length === 0) {
+    throw new Error('ORGANIZATION_NOT_FOUND')
+  }
+
+  if (organizations.length > 1) {
+    throw new Error('MULTIPLE_ORGANIZATIONS_NOT_SUPPORTED')
+  }
+
+  return organizations[0]
+}
+</file>
+
+<file path="src/modules/client/services/client.ts">
+// src/modules/client/db/client.repository.ts
+
+import { eq } from 'drizzle-orm'
+
+import { db } from '#/infrastructure/database'
+import { doctorClient } from '../db/schema'
+
+export function findDoctorClientByUserId(
+  organizationId: string,
+  userId: string,
+) {
+  return db.query.doctorClient.findFirst({
+    where: {
+      organizationId,
+      userId,
+    },
+  })
+}
+
+export function findDoctorClientByEmail(
+  organizationId: string,
+  email: string,
+) {
+  return db.query.doctorClient.findFirst({
+    where: {
+      organizationId,
+      email: email.trim().toLowerCase(),
+    },
+  })
+}
+
+export async function createDoctorClient(
+  values: typeof doctorClient.$inferInsert,
+) {
+  const [created] = await db
+    .insert(doctorClient)
+    .values(values)
+    .returning()
+
+  return created
+}
+
+export async function updateDoctorClient(
+  id: string,
+  values: Partial<typeof doctorClient.$inferInsert>,
+) {
+  const [updated] = await db
+    .update(doctorClient)
+    .set({
+      ...values,
+      updatedAt: new Date(),
+    })
+    .where(eq(doctorClient.id, id))
+    .returning()
+
+  return updated
+}
+</file>
+
+<file path="src/modules/clinic/db/schema.ts">
+import { integer, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core'
+
+import { organization } from '#/infrastructure/auth/db/schema.ts'
+
+export const clinicStatusEnum = pgEnum('clinic_status', ['active', 'inactive'])
+
+export const clinic = pgTable('clinic', {
+  id: uuid('id').primaryKey().defaultRandom(),
+
+  organizationId: text('organization_id')
+    .notNull()
+    .references(() => organization.id, { onDelete: 'cascade' }),
+
+  name: text('name').notNull(),
+
+  publicSlug: text('public_slug').notNull().unique(),
+
+  phone: text('phone'),
+  email: text('email'),
+
+  addressLine: text('address_line'),
+  neighborhood: text('neighborhood'),
+  municipality: text('municipality'),
+  state: text('state'),
+  postalCode: text('postal_code'),
+
+  timezone: text('timezone').notNull().default('America/Mexico_City'),
+
+  slotIntervalMinutes: integer('slot_interval_minutes').notNull().default(15),
+
+  status: clinicStatusEnum('status').notNull().default('active'),
+
+  createdAt: timestamp('created_at', {
+    withTimezone: true,
+  })
+    .notNull()
+    .defaultNow(),
+
+  updatedAt: timestamp('updated_at', {
+    withTimezone: true,
+  })
+    .notNull()
+    .defaultNow(),
+
+  archivedAt: timestamp('archived_at', { withTimezone: true }),
+}, (table) => [
+  uniqueIndex('clinic_id_organization_id_unique').on(table.id, table.organizationId),
+])
+</file>
+
+<file path="src/modules/clinic/hooks/clinicQueries.ts">
+'use client'
+
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query'
+
+import type { ClinicInput } from '../schemas/clinic'
+
+import {
+  archiveClinicAction,
+  createClinicAction,
+  listClinicsAction,
+  updateClinicAction,
+} from '../server/clinic'
+
+const clinicsQueryKey = ['clinics'] as const
+
+export function useClinics() {
+  return useQuery({
+    queryKey: clinicsQueryKey,
+    queryFn: () => listClinicsAction(),
+  })
+}
+
+export function useCreateClinic() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (input: ClinicInput) =>
+      createClinicAction(input),
+
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: clinicsQueryKey,
+      }),
+  })
+}
+
+export function useUpdateClinic() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({
+      id,
+      ...input
+    }: ClinicInput & { id: string }) =>
+      updateClinicAction({
+        id,
+        ...input,
+      }),
+
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: clinicsQueryKey,
+      }),
+  })
+}
+
+export function useArchiveClinic() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (id: string) =>
+      archiveClinicAction({ id }),
+
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: clinicsQueryKey,
+      }),
+  })
+}
+</file>
+
+<file path="src/modules/clinic/schemas/clinic.ts">
+import { z } from 'zod'
+
+const optionalText = (max: number) =>
+  z
+    .string()
+    .trim()
+    .max(max)
+    .transform((value) => value || undefined)
+    .optional()
+
+export const clinicInputSchema = z.object({
+  name: z.string().trim().min(1, 'El nombre es obligatorio').max(120),
+  phone: optionalText(30),
+  email: z
+    .email('El correo no es válido')
+    .max(255)
+    .or(z.literal(''))
+    .transform((value) => value || undefined)
+    .optional(),
+  addressLine: optionalText(255),
+  neighborhood: optionalText(120),
+  municipality: optionalText(120),
+  state: optionalText(120),
+  postalCode: optionalText(20),
+  timezone: z.string().trim().min(1, 'La zona horaria es obligatoria').max(100),
+  slotIntervalMinutes: z.number().int().min(5).max(120).default(15),
+  status: z.enum(['active', 'inactive']),
+})
+
+export const clinicIdSchema = z.object({
+  id: z.uuid(),
+})
+
+export const updateClinicSchema = clinicInputSchema.extend({
+  id: z.uuid(),
+})
+
+export type ClinicInput = z.infer<typeof clinicInputSchema>
+</file>
+
+<file path="src/modules/clinic/server/clinic.ts">
+'use server'
+
+import { revalidatePath } from 'next/cache'
+
+import { requireOrganization } from '#/infrastructure/auth/requireOrganization'
+
+import {
+  archiveClinic,
+  createClinic,
+  listClinics,
+  updateClinic,
+} from '../services/clinic'
+
+import {
+  clinicIdSchema,
+  clinicInputSchema,
+  updateClinicSchema,
+} from '../schemas/clinic'
+
+export async function listClinicsAction() {
+  const { organizationId } = await requireOrganization()
+
+  return listClinics(organizationId)
+}
+
+export async function createClinicAction(input: unknown) {
+  const data = clinicInputSchema.parse(input)
+
+  const { organizationId } = await requireOrganization()
+
+  const clinic = await createClinic(
+    organizationId,
+    data,
+  )
+
+  revalidatePath('/org/clinics')
+
+  return clinic
+}
+
+export async function updateClinicAction(input: unknown) {
+  const data = updateClinicSchema.parse(input)
+
+  const { organizationId } = await requireOrganization()
+
+  const { id, ...clinicInput } = data
+
+  const clinic = await updateClinic(
+    organizationId,
+    id,
+    clinicInput,
+  )
+
+  revalidatePath('/org/clinics')
+
+  return clinic
+}
+
+export async function archiveClinicAction(input: unknown) {
+  const data = clinicIdSchema.parse(input)
+
+  const { organizationId } = await requireOrganization()
+
+  const clinic = await archiveClinic(
+    organizationId,
+    data.id,
+  )
+
+  revalidatePath('/org/clinics')
+
+  return clinic
+}
+</file>
+
+<file path="src/modules/clinic/services/clinic.ts">
+import { and, eq, isNull, asc } from 'drizzle-orm'
+
+import { db } from '#/infrastructure/database/index.ts'
+
+import { clinic } from '../db/schema.ts'
+import type { ClinicInput } from '../schemas/clinic.ts'
+import { randomUUID } from 'crypto'
+
+export async function archiveClinic(organizationId: string, id: string) {
+  const [archivedClinic] = await db
+    .update(clinic)
+    .set({ archivedAt: new Date(), updatedAt: new Date() })
+    .where(
+      and(
+        eq(clinic.id, id),
+        eq(clinic.organizationId, organizationId),
+        isNull(clinic.archivedAt),
+      ),
+    )
+    .returning()
+
+  return archivedClinic
+}
+
+export function listClinics(organizationId: string) {
+  return db
+    .select()
+    .from(clinic)
+    .where(
+      and(eq(clinic.organizationId, organizationId), isNull(clinic.archivedAt)),
+    )
+    .orderBy(asc(clinic.name))
+}
+
+
+export async function createClinic(
+  organizationId: string,
+  input: ClinicInput,
+) {
+  const [createdClinic] = await db
+    .insert(clinic)
+    .values({ ...input, organizationId, publicSlug: `${toSlug(input.name)}-${randomUUID().slice(0, 8)}` })
+    .returning()
+
+  return createdClinic
+}
+
+function toSlug(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'clinica'
+}
+
+
+export async function updateClinic(
+  organizationId: string,
+  id: string,
+  input: ClinicInput,
+) {
+  const [updatedClinic] = await db
+    .update(clinic)
+    .set({ ...input, updatedAt: new Date() })
+    .where(
+      and(
+        eq(clinic.id, id),
+        eq(clinic.organizationId, organizationId),
+        isNull(clinic.archivedAt),
+      ),
+    )
+    .returning()
+
+  return updatedClinic
+}
+</file>
+
+<file path="src/modules/order/db/schema.ts">
+import {
+  index,
+  integer,
+  jsonb,
+  pgEnum,
+  pgTable,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+} from 'drizzle-orm/pg-core'
+
+import { organization, user } from '#/infrastructure/auth/db/schema'
+import { patientHistory } from '#/modules/patient/db/schema'
+import { doctorClient } from '#/modules/client/db/schema'
+import { clinic } from '#/modules/clinic/db/schema'
+
+export const orderSource = pgEnum('order_source', ['public', 'internal'])
+export const orderType = pgEnum('order_type', ['radiography', 'cbct'])
+export const orderStatus = pgEnum('order_status', ['draft', 'received', 'scheduled', 'in_progress', 'ready', 'delivered', 'cancelled'])
+
+export const order = pgTable('order', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  organizationId: text('organization_id').notNull().references(() => organization.id, { onDelete: 'cascade' }),
+  doctorClientId: uuid('doctor_client_id').notNull().references(() => doctorClient.id),
+  patientHistoryId: uuid('patient_history_id').notNull().references(() => patientHistory.id),
+  clinicId: uuid('clinic_id').notNull().references(() => clinic.id),
+  folio: text('folio').notNull(),
+  type: orderType('type').notNull(),
+  status: orderStatus('status').default('draft').notNull(),
+  source: orderSource('source').default('internal').notNull(),
+  details: jsonb('details').$type<Record<string, unknown>>().notNull(),
+  detailsSchemaVersion: integer('details_schema_version').default(1).notNull(),
+  expectedDeliveryAt: timestamp('expected_delivery_at', { withTimezone: true }),
+  deliveredAt: timestamp('delivered_at', { withTimezone: true }),
+  notes: text('notes'),
+  createdByUserId: text('created_by_user_id').references(() => user.id, { onDelete: 'set null' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  index('order_organization_idx').on(table.organizationId),
+  index('order_doctor_client_idx').on(table.doctorClientId),
+  index('order_patient_history_idx').on(table.patientHistoryId),
+  index('order_status_idx').on(table.status),
+  uniqueIndex('order_organization_folio_unique').on(table.organizationId, table.folio),
+])
+
+export const orderAssetType = pgEnum('order_asset_type', ['pdf', 'image', 'dicom', 'zip', 'other'])
+export const orderEventType = pgEnum('order_event_type', ['order.created', 'order.scheduled', 'order.started', 'result.uploaded', 'result.finalized', 'email.sent', 'order.delivered', 'order.cancelled'])
+
+export const orderResult = pgTable('order_result', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  orderId: uuid('order_id').notNull().references(() => order.id, { onDelete: 'cascade' }),
+  observations: text('observations'),
+  realizedAt: timestamp('realized_at', { withTimezone: true }),
+  finalizedAt: timestamp('finalized_at', { withTimezone: true }),
+  finalizedByUserId: text('finalized_by_user_id').references(() => user.id, { onDelete: 'set null' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex('order_result_order_unique').on(table.orderId),
+])
+
+export const orderAsset = pgTable('order_asset', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  orderId: uuid('order_id').notNull().references(() => order.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  storageKey: text('storage_key').notNull(),
+  type: orderAssetType('type').notNull(),
+  metadata: jsonb('metadata').$type<Record<string, unknown>>().default({}).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [index('order_asset_order_idx').on(table.orderId)])
+
+export const orderEvent = pgTable('order_event', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  orderId: uuid('order_id').notNull().references(() => order.id, { onDelete: 'cascade' }),
+  type: orderEventType('type').notNull(),
+  metadata: jsonb('metadata').$type<Record<string, unknown>>().default({}).notNull(),
+  userId: text('user_id').references(() => user.id, { onDelete: 'set null' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [index('order_event_order_idx').on(table.orderId)])
+</file>
+
+<file path="src/modules/order/hooks/generalOrder.ts">
+'use client'
+
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query'
+
+import {
+  createInternalOrderAction,
+  listOrdersAction,
+} from '#/modules/order/server/generalOrder'
+
+import type {
+  CreateOrderInput,
+} from '#/modules/order/schemas/generalOrder'
+
+export const ordersQueryKey = ['org-orders'] as const
+
+export function useOrders() {
+  return useQuery({
+    queryKey: ordersQueryKey,
+    queryFn: () => listOrdersAction(),
+  })
+}
+
+export function useCreateInternalOrder() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (values: CreateOrderInput) =>
+      createInternalOrderAction(values),
+
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: ordersQueryKey,
+      }),
+  })
+}
+</file>
+
+<file path="src/modules/order/schemas/generalOrder.ts">
+import { z } from 'zod'
+
+export const doctorClientSchema = z.object({
+  firstName: z
+    .string()
+    .trim()
+    .min(1, 'El nombre es obligatorio')
+    .max(100),
+
+  paternalLastName: z
+    .string()
+    .trim()
+    .min(1, 'El apellido paterno es obligatorio')
+    .max(100),
+
+  maternalLastName: z
+    .string()
+    .trim()
+    .max(100)
+    .optional(),
+
+  professionalLicense: z
+    .string()
+    .trim()
+    .max(50)
+    .optional(),
+
+  specialty: z
+    .string()
+    .trim()
+    .max(150)
+    .optional(),
+
+  clinicName: z
+    .string()
+    .trim()
+    .max(200)
+    .optional(),
+
+  phone: z
+    .string()
+    .trim()
+    .max(20)
+    .optional(),
+
+  email: z
+    .string()
+    .trim()
+    .email('Correo electrónico inválido'),
+})
+
+export const patientSchema = z.object({
+  firstName: z
+    .string()
+    .trim()
+    .min(1, 'El nombre es obligatorio')
+    .max(100),
+
+  paternalLastName: z
+    .string()
+    .trim()
+    .max(100)
+    .optional(),
+
+  maternalLastName: z
+    .string()
+    .trim()
+    .max(100)
+    .optional(),
+
+  birthDate: z
+    .string()
+    .optional(),
+
+  sex: z
+    .enum([
+      'male',
+      'female',
+      'other',
+      'unspecified',
+    ])
+    .optional(),
+
+  phone: z
+    .string()
+    .trim()
+    .max(20)
+    .optional(),
+
+  email: z
+    .union([
+      z.string().trim().email('Correo electrónico inválido'),
+      z.literal(''),
+    ])
+    .optional(),
+})
+
+export const radiographyDetailsSchema = z.object({
+  radiographyType: z.string().trim().min(1, 'El tipo de radiografía es obligatorio'),
+  region: z.string().trim().min(1, 'La pieza o región es obligatoria'),
+  clinicalIndication: z.string().trim().min(1, 'La indicación clínica es obligatoria'),
+  notes: z.string().trim().optional(),
+})
+
+export const cbctDetailsSchema = z.object({
+  anatomicalRegion: z.string().trim().min(1, 'La región anatómica es obligatoria'),
+  specificArea: z.string().trim().min(1, 'El área específica es obligatoria'),
+  clinicalIndication: z.string().trim().min(1, 'La indicación clínica es obligatoria'),
+  notes: z.string().trim().optional(),
+})
+
+export const orderGeneralSchema = z.object({
+  type: z.enum([
+    'radiography',
+    'cbct',
+  ]),
+
+  doctor: doctorClientSchema,
+
+  patient: patientSchema,
+})
+
+export const createOrderSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('radiography'),
+    doctor: doctorClientSchema,
+    patient: patientSchema,
+    clinicId: z.string().uuid('La clínica es obligatoria'),
+    details: radiographyDetailsSchema,
+  }),
+  z.object({
+    type: z.literal('cbct'),
+    doctor: doctorClientSchema,
+    patient: patientSchema,
+    clinicId: z.string().uuid('La clínica es obligatoria'),
+    details: cbctDetailsSchema,
+  }),
+])
+
+export type DoctorClientInput =
+  z.infer<typeof doctorClientSchema>
+
+export type PatientInput =
+  z.infer<typeof patientSchema>
+
+export type OrderGeneralInput =
+  z.infer<typeof orderGeneralSchema>
+
+export type RadiographyDetailsInput =
+  z.infer<typeof radiographyDetailsSchema>
+
+export type CBCTDetailsInput =
+  z.infer<typeof cbctDetailsSchema>
+
+export type CreateOrderInput =
+  z.infer<typeof createOrderSchema>
+</file>
+
+<file path="src/modules/order/server/generalOrder.ts">
+'use server'
+
+import { createOrderSchema } from '#/modules/order/schemas/generalOrder'
+import {
+  createOrder,
+  findOrganization,
+  listOrders,
+  getOrderDetails,
+  updateOrderStatus,
+} from '#/modules/order/services/generalOrder'
+import { deliverOrderResults } from '#/modules/order/services/results'
+import { listClinics } from '#/modules/clinic/services/clinic'
+import { requireOrganization } from '#/infrastructure/auth/requireOrganization'
+import { appointmentAccess } from '#/modules/appointment/services/appointment'
+
+export async function createPublicOrderAction(values: unknown) {
+  const parsed = createOrderSchema.safeParse(values)
+  if (!parsed.success) {
+    return { success: false as const, error: 'INVALID_INPUT', issues: parsed.error.flatten() }
+  }
+
+  const org = await findOrganization()
+  if (!org) return { success: false as const, error: 'ORGANIZATION_NOT_FOUND' }
+
+  const result = await createOrder({ organizationId: org.id, userId: null, source: 'public', data: parsed.data })
+  return { success: true as const, data: { orderId: result.order.id, folio: result.order.folio } }
+}
+
+export async function getPublicClinicsAction() {
+  const org = await findOrganization()
+  if (!org) throw new Error('ORGANIZATION_NOT_FOUND')
+  return listClinics(org.id)
+}
+
+export async function createInternalOrderAction(values: unknown) {
+  const { user, organizationId } = await requireOrganization()
+  const parsed = createOrderSchema.safeParse(values)
+  if (!parsed.success) {
+    return { success: false as const, error: 'INVALID_INPUT', issues: parsed.error.flatten() }
+  }
+
+  const result = await createOrder({ organizationId, userId: user.id, source: 'internal', data: parsed.data })
+  return { success: true as const, data: { orderId: result.order.id, folio: result.order.folio } }
+}
+
+export async function listOrdersAction() {
+  const { organizationId } = await requireOrganization()
+  return listOrders(organizationId)
+}
+
+export async function getOrderDetailsAction(orderId: string) {
+  const { organizationId } = await requireOrganization()
+  return getOrderDetails(organizationId, orderId)
+}
+
+export async function updateOrderStatusAction(
+  orderId: string,
+  status: 'draft' | 'received' | 'scheduled' | 'in_progress' | 'ready' | 'delivered' | 'cancelled',
+) {
+  const { user, organizationId } = await requireOrganization()
+  const access = await appointmentAccess(organizationId, user.id)
+  if (!['owner', 'assistant'].includes(access.role)) throw new Error('FORBIDDEN')
+  return updateOrderStatus(organizationId, orderId, status, user.id)
+}
+
+export async function deliverOrderResultsAction(orderId: string) {
+  const { user, organizationId } = await requireOrganization()
+  const access = await appointmentAccess(organizationId, user.id)
+  if (!['owner', 'assistant'].includes(access.role)) throw new Error('FORBIDDEN')
+  return deliverOrderResults(organizationId, orderId, user.id)
+}
+</file>
+
+<file path="src/modules/order/services/generalOrder.ts">
+import { eq } from 'drizzle-orm'
+
+import { db } from '#/infrastructure/database'
+import {
+  patient,
+  patientHistory,
+} from '#/modules/patient/db/schema'
+
+import {
+  order,
+  orderEvent,
+  orderResult,
+  orderAsset,
+} from '#/modules/order/db/schema'
+
+import { doctorClient } from '#/modules/client/db/schema'
+
+import type {
+  CreateOrderInput,
+} from '#/modules/order/schemas/generalOrder'
+
+export async function findOrganization() {
+  return db.query.organization.findFirst()
+}
+
+type CreateOrderParams = {
+  organizationId: string
+  userId?: string | null
+  source: 'public' | 'internal'
+  data: CreateOrderInput
+}
+
+export async function createOrder({
+  organizationId,
+  userId,
+  source,
+  data,
+}: CreateOrderParams) {
+  return db.transaction(async (tx) => {
+    const clinicRecord = await tx.query.clinic.findFirst({
+      where: {
+        id: data.clinicId,
+        organizationId,
+      },
+    })
+
+    if (!clinicRecord) {
+      throw new Error('CLINIC_NOT_FOUND')
+    }
+
+    /*
+     * 1. Find or create DoctorClient
+     */
+    const existingDoctor = await tx.query.doctorClient.findFirst({
+      where: {
+        organizationId,
+        email: data.doctor.email.trim().toLowerCase(),
+      },
+    })
+
+    let doctor
+
+    const doctorData = {
+      firstName: data.doctor.firstName.trim(),
+      paternalLastName: data.doctor.paternalLastName.trim(),
+      maternalLastName: data.doctor.maternalLastName?.trim() || null,
+      professionalLicense: data.doctor.professionalLicense?.trim() || null,
+      specialty: data.doctor.specialty?.trim() || null,
+      clinicName: data.doctor.clinicName?.trim() || null,
+      phone: data.doctor.phone?.trim() || null,
+      email: data.doctor.email.trim().toLowerCase(),
+      updatedAt: new Date(),
+    }
+
+    if (existingDoctor) {
+      const [updatedDoctor] = await tx
+        .update(doctorClient)
+        .set(doctorData)
+        .where(eq(doctorClient.id, existingDoctor.id))
+        .returning()
+      doctor = updatedDoctor
+    } else {
+      const [createdDoctor] = await tx
+        .insert(doctorClient)
+        .values({
+          ...doctorData,
+          organizationId,
+          userId: userId || null,
+        })
+        .returning()
+      doctor = createdDoctor
+    }
+
+    /*
+     * 2. Find or create Patient
+     */
+    const birthDateStr = data.patient.birthDate || null
+
+    const existingPatient = await tx.query.patient.findFirst({
+      where: {
+        AND: [
+          { organizationId },
+          { firstName: data.patient.firstName.trim() },
+          data.patient.paternalLastName?.trim()
+            ? { paternalLastName: data.patient.paternalLastName.trim() }
+            : { paternalLastName: { isNull: true } },
+          data.patient.maternalLastName?.trim()
+            ? { maternalLastName: data.patient.maternalLastName.trim() }
+            : { maternalLastName: { isNull: true } },
+          birthDateStr
+            ? { birthDate: birthDateStr }
+            : { birthDate: { isNull: true } },
+        ],
+      },
+    })
+
+    let patientRecord
+    let history
+
+    if (existingPatient) {
+      patientRecord = existingPatient
+
+      const existingHistory = await tx.query.patientHistory.findFirst({
+        where: { patientId: existingPatient.id },
+      })
+      if (!existingHistory) {
+        const [createdHistory] = await tx
+          .insert(patientHistory)
+          .values({ patientId: existingPatient.id })
+          .returning()
+        history = createdHistory
+      } else {
+        history = existingHistory
+      }
+    } else {
+      const [createdPatient] = await tx
+        .insert(patient)
+        .values({
+          organizationId,
+          firstName: data.patient.firstName.trim(),
+          paternalLastName: data.patient.paternalLastName?.trim() || null,
+          maternalLastName: data.patient.maternalLastName?.trim() || null,
+          birthDate: birthDateStr,
+          sex: data.patient.sex || 'unspecified',
+          phone: data.patient.phone?.trim() || null,
+          email: data.patient.email?.trim() || null,
+        })
+        .returning()
+      patientRecord = createdPatient
+
+      const [createdHistory] = await tx
+        .insert(patientHistory)
+        .values({ patientId: createdPatient.id })
+        .returning()
+      history = createdHistory
+    }
+
+    /*
+     * 3. Folio
+     */
+    const folio = `ORD-${crypto.randomUUID().slice(0, 8).toUpperCase()}`
+
+    /*
+     * 4. Create Order
+     */
+    const [createdOrder] = await tx
+      .insert(order)
+      .values({
+        organizationId,
+        clinicId: data.clinicId,
+        doctorClientId: doctor.id,
+        patientHistoryId: history.id,
+        type: data.type,
+        status: source === 'public' ? 'received' : 'draft',
+        source,
+        folio,
+        details: data.details,
+        detailsSchemaVersion: 1,
+        createdByUserId: userId || null,
+      })
+      .returning()
+
+    /*
+     * 5. Log creation event
+     */
+    await tx.insert(orderEvent).values({
+      orderId: createdOrder.id,
+      type: 'order.created',
+      userId: userId || null,
+      metadata: {},
+    })
+
+    return {
+      doctorClient: doctor,
+      patient: patientRecord,
+      patientHistory: history,
+      order: createdOrder,
+    }
+  })
+}
+
+export async function listOrders(organizationId: string) {
+  return db.query.order.findMany({
+    where: { organizationId },
+    with: {
+      doctorClient: true,
+      patientHistory: {
+        with: {
+          patient: true,
+        },
+      },
+      clinic: true,
+    },
+    orderBy: { createdAt: 'desc' },
+  })
+}
+
+export async function getOrderDetails(organizationId: string, orderId: string) {
+  return db.query.order.findFirst({
+    where: {
+      organizationId,
+      id: orderId,
+    },
+    with: {
+      doctorClient: true,
+      patientHistory: {
+        with: {
+          patient: true,
+        },
+      },
+      clinic: true,
+      results: {
+        with: {
+          finalizedBy: true,
+        },
+      },
+      assets: true,
+      events: {
+        with: {
+          user: true,
+        },
+      },
+    },
+  })
+}
+
+export async function updateOrderStatus(
+  organizationId: string,
+  orderId: string,
+  status: 'draft' | 'received' | 'scheduled' | 'in_progress' | 'ready' | 'delivered' | 'cancelled',
+  userId: string,
+) {
+  if (status === 'scheduled' || status === 'in_progress') {
+    throw new Error('ORDER_STATUS_MANAGED_BY_APPOINTMENT')
+  }
+
+  return db.transaction(async (tx) => {
+    const existing = await tx.query.order.findFirst({
+      where: {
+        organizationId,
+        id: orderId,
+      },
+    })
+
+    if (!existing) {
+      throw new Error('ORDER_NOT_FOUND')
+    }
+
+    const [updated] = await tx
+      .update(order)
+      .set({
+        status,
+        updatedAt: new Date(),
+        deliveredAt: status === 'delivered' ? new Date() : existing.deliveredAt,
+      })
+      .where(eq(order.id, orderId))
+      .returning()
+
+    // Determine event type
+    let eventType: 'order.created' | 'order.scheduled' | 'order.started' | 'result.uploaded' | 'result.finalized' | 'email.sent' | 'order.delivered' | 'order.cancelled' | null = null
+    
+    if (status === 'delivered') eventType = 'order.delivered'
+    if (status === 'cancelled') eventType = 'order.cancelled'
+
+    if (eventType) {
+      await tx.insert(orderEvent).values({
+        orderId,
+        type: eventType,
+        userId,
+        metadata: {},
+      })
+    }
+
+    return updated
+  })
+}
+
+export type AddOrderResultAndAssetsParams = {
+  orderId: string
+  userId: string
+  observations: string
+  realizedAt: Date
+  assets: {
+    name: string
+    storageKey: string
+    type: 'pdf' | 'image' | 'dicom' | 'zip' | 'other'
+    metadata?: Record<string, unknown>
+  }[]
+}
+
+export async function addOrderResultAndAssets(
+  organizationId: string,
+  params: AddOrderResultAndAssetsParams,
+) {
+  return db.transaction(async (tx) => {
+    const existingOrder = await tx.query.order.findFirst({
+      where: {
+        organizationId,
+        id: params.orderId,
+      },
+    })
+
+    if (!existingOrder) {
+      throw new Error('ORDER_NOT_FOUND')
+    }
+
+    const [result] = await tx
+      .insert(orderResult)
+      .values({
+        orderId: params.orderId,
+        observations: params.observations,
+        realizedAt: params.realizedAt,
+        finalizedAt: new Date(),
+        finalizedByUserId: params.userId,
+      })
+      .returning()
+
+    const createdAssets = []
+    for (const asset of params.assets) {
+      const [createdAsset] = await tx
+        .insert(orderAsset)
+        .values({
+          orderId: params.orderId,
+          name: asset.name,
+          storageKey: asset.storageKey,
+          type: asset.type,
+          metadata: asset.metadata || {},
+        })
+        .returning()
+
+      createdAssets.push(createdAsset)
+
+      await tx.insert(orderEvent).values({
+        orderId: params.orderId,
+        type: 'result.uploaded',
+        userId: params.userId,
+        metadata: { assetId: createdAsset.id, name: asset.name },
+      })
+    }
+
+    await tx
+      .update(order)
+      .set({
+        status: 'ready',
+        updatedAt: new Date(),
+      })
+      .where(eq(order.id, params.orderId))
+
+    await tx.insert(orderEvent).values({
+      orderId: params.orderId,
+      type: 'result.finalized',
+      userId: params.userId,
+      metadata: { resultId: result.id },
+    })
+
+    return {
+      result,
+      assets: createdAssets,
+    }
+  })
+}
+
+export async function deliverOrderResults(
+  organizationId: string,
+  orderId: string,
+  userId: string,
+) {
+  return db.transaction(async (tx) => {
+    const existingOrder = await tx.query.order.findFirst({
+      where: {
+        organizationId,
+        id: orderId,
+      },
+      with: {
+        doctorClient: true,
+      },
+    })
+
+    if (!existingOrder) {
+      throw new Error('ORDER_NOT_FOUND')
+    }
+
+    if (existingOrder.status !== 'ready') {
+      throw new Error('ORDER_NOT_READY')
+    }
+
+    const [updatedOrder] = await tx
+      .update(order)
+      .set({
+        status: 'delivered',
+        deliveredAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(order.id, orderId))
+      .returning()
+
+    await tx.insert(orderEvent).values({
+      orderId,
+      type: 'email.sent',
+      userId,
+      metadata: {
+        to: existingOrder.doctorClient.email,
+        subject: `Resultados de estudio listo - Folio ${existingOrder.folio}`,
+        secureLink: `/orders/results/${orderId}`,
+      },
+    })
+
+    await tx.insert(orderEvent).values({
+      orderId,
+      type: 'order.delivered',
+      userId,
+      metadata: {},
+    })
+
+    console.log(`[MOCK EMAIL] Enviando correo a ${existingOrder.doctorClient.email} para orden Folio ${existingOrder.folio}`)
+
+    return updatedOrder
+  })
+}
+</file>
+
+<file path="src/modules/order/services/results.ts">
+import { and, eq } from 'drizzle-orm'
+import { createClient } from '@supabase/supabase-js'
+import { Resend } from 'resend'
+
+import { db } from '#/infrastructure/database'
+import { order, orderAsset, orderEvent, orderResult } from '#/modules/order/db/schema'
+import { ResultReadyEmail } from '#/modules/order/emails/ResultReadyEmail'
+
+const MAX_FILES = 10
+const MAX_FILE_BYTES = 100 * 1024 * 1024
+const MAX_REQUEST_BYTES = 500 * 1024 * 1024
+const RESULTS_BUCKET = process.env.SUPABASE_RESULTS_BUCKET || 'order-results'
+
+function requiredEnv(name: 'SUPABASE_URL' | 'SUPABASE_SERVICE_ROLE_KEY' | 'RESEND_API_KEY' | 'RESEND_FROM_EMAIL') {
+  const value = process.env[name]
+  if (!value) throw new Error(`RESULT_DELIVERY_CONFIG_MISSING:${name}`)
+  return value
+}
+
+function storage() {
+  return createClient(
+    requiredEnv('SUPABASE_URL'),
+    requiredEnv('SUPABASE_SERVICE_ROLE_KEY'),
+    { auth: { persistSession: false } },
+  )
+}
+
+function normalizeEmail(email: string) {
+  return email.trim().toLowerCase()
+}
+
+function assetType(file: File): 'image' | 'dicom' | null {
+  const name = file.name.toLowerCase()
+  if (file.type === 'image/jpeg' && /\.jpe?g$/.test(name)) return 'image'
+  if ((file.type === 'application/dicom' || file.type === 'application/dicom+json' || !file.type) && /\.(dcm|dicom)$/.test(name)) return 'dicom'
+  return null
+}
+
+async function hasValidMagicBytes(file: File, type: 'image' | 'dicom') {
+  const bytes = new Uint8Array(await file.slice(0, type === 'dicom' ? 132 : 3).arrayBuffer())
+  return type === 'image'
+    ? bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff
+    : bytes[128] === 0x44 && bytes[129] === 0x49 && bytes[130] === 0x43 && bytes[131] === 0x4d
+}
+
+export async function uploadOrderResult(
+  organizationId: string,
+  userId: string,
+  input: { orderId: string; observations: string; realizedAt: Date; files: File[] },
+) {
+  if (!input.files.length || input.files.length > MAX_FILES) throw new Error('INVALID_FILE_COUNT')
+  const totalBytes = input.files.reduce((total, file) => total + file.size, 0)
+  if (totalBytes > MAX_REQUEST_BYTES || input.files.some((file) => file.size > MAX_FILE_BYTES)) throw new Error('FILE_TOO_LARGE')
+
+  const typedFiles = input.files.map((file) => ({ file, type: assetType(file) }))
+  if (typedFiles.some(({ type }) => !type)) throw new Error('UNSUPPORTED_FILE_TYPE')
+  if ((await Promise.all(typedFiles.map(({ file, type }) => hasValidMagicBytes(file, type!)))).some((valid) => !valid)) {
+    throw new Error('INVALID_FILE_SIGNATURE')
+  }
+
+  const existing = await db.query.order.findFirst({
+    where: { id: input.orderId, organizationId },
+    with: { results: true },
+  })
+  if (!existing) throw new Error('ORDER_NOT_FOUND')
+  if (existing.results.length) throw new Error('RESULT_ALREADY_FINALIZED')
+  if (existing.status === 'delivered' || existing.status === 'cancelled') throw new Error('ORDER_NOT_ACCEPTING_RESULTS')
+
+  const supabase = storage()
+  const uploaded: { name: string; storageKey: string; type: 'image' | 'dicom'; metadata: Record<string, unknown> }[] = []
+  for (const { file, type } of typedFiles) {
+    const storageKey = `${organizationId}/${input.orderId}/${crypto.randomUUID()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
+    const { error } = await supabase.storage.from(RESULTS_BUCKET).upload(storageKey, file, {
+      contentType: file.type || 'application/dicom',
+      upsert: false,
+    })
+    if (error) throw new Error(`RESULT_UPLOAD_FAILED:${error.message}`)
+    uploaded.push({ name: file.name, storageKey, type: type!, metadata: { size: file.size } })
+  }
+
+  return db.transaction(async (tx) => {
+    const alreadyFinalized = await tx.query.orderResult.findFirst({ where: { orderId: input.orderId } })
+    if (alreadyFinalized) throw new Error('RESULT_ALREADY_FINALIZED')
+
+    const [result] = await tx.insert(orderResult).values({
+      orderId: input.orderId,
+      observations: input.observations,
+      realizedAt: input.realizedAt,
+      finalizedAt: new Date(),
+      finalizedByUserId: userId,
+    }).returning()
+
+    const assets = await tx.insert(orderAsset).values(uploaded.map((asset) => ({ orderId: input.orderId, ...asset }))).returning()
+    await tx.update(order).set({ status: 'ready', updatedAt: new Date() }).where(eq(order.id, input.orderId))
+    await tx.insert(orderEvent).values([
+      ...assets.map((asset) => ({ orderId: input.orderId, type: 'result.uploaded' as const, userId, metadata: { assetId: asset.id, name: asset.name } })),
+      { orderId: input.orderId, type: 'result.finalized', userId, metadata: { resultId: result.id } },
+    ])
+    return { result, assets }
+  })
+}
+
+export async function deliverOrderResults(organizationId: string, orderId: string, userId: string) {
+  const existing = await db.query.order.findFirst({
+    where: { id: orderId, organizationId },
+    with: { doctorClient: true, results: true },
+  })
+  if (!existing) throw new Error('ORDER_NOT_FOUND')
+  if (existing.status !== 'ready' || !existing.results.length) throw new Error('ORDER_NOT_READY')
+
+  const resend = new Resend(requiredEnv('RESEND_API_KEY'))
+  const { error } = await resend.emails.send({
+    from: requiredEnv('RESEND_FROM_EMAIL'),
+    to: existing.doctorClient.email,
+    subject: `Resultados de estudio listos - Folio ${existing.folio}`,
+    react: ResultReadyEmail({ folio: existing.folio, resultUrl: `${process.env.BETTER_AUTH_URL}/portal/results/${orderId}` }),
+  })
+  if (error) throw new Error(`RESULT_EMAIL_FAILED:${error.message}`)
+
+  return db.transaction(async (tx) => {
+    const [updated] = await tx.update(order).set({ status: 'delivered', deliveredAt: new Date(), updatedAt: new Date() })
+      .where(and(eq(order.id, orderId), eq(order.status, 'ready'))).returning()
+    if (!updated) throw new Error('ORDER_NOT_READY')
+    await tx.insert(orderEvent).values([
+      { orderId, type: 'email.sent', userId, metadata: { to: existing.doctorClient.email, subject: `Resultados de estudio listos - Folio ${existing.folio}`, secureLink: `/portal/results/${orderId}` } },
+      { orderId, type: 'order.delivered', userId, metadata: {} },
+    ])
+    return updated
+  })
+}
+
+export async function getDoctorResult(orderId: string, email: string) {
+  const found = await db.query.order.findFirst({
+    where: { id: orderId, status: 'delivered' },
+    with: { doctorClient: true, results: true, assets: true },
+  })
+  if (!found || normalizeEmail(found.doctorClient.email) !== normalizeEmail(email) || found.results.length !== 1) return null
+  return found
+}
+
+export async function getDoctorAssetUrl(orderId: string, assetId: string, email: string) {
+  const found = await getDoctorResult(orderId, email)
+  const asset = found?.assets.find((item) => item.id === assetId)
+  if (!asset) return null
+  const { data, error } = await storage().storage.from(RESULTS_BUCKET).createSignedUrl(asset.storageKey, 60)
+  if (error || !data) throw new Error(`RESULT_URL_FAILED:${error?.message ?? 'unknown'}`)
+  return data.signedUrl
+}
+</file>
+
+<file path="src/modules/patient/db/schema.ts">
+import {
+  date,
+  index,
+  pgEnum,
+  pgTable,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+} from 'drizzle-orm/pg-core'
+
+import { organization } from '#/infrastructure/auth/db/schema'
+
+export const patientSexEnum = pgEnum('patient_sex', [
+  'male',
+  'female',
+  'other',
+  'unspecified',
+])
+
+export const patient = pgTable(
+  'patient',
+  {
+    id: uuid('id')
+      .defaultRandom()
+      .primaryKey(),
+
+    organizationId: text('organization_id')
+      .notNull()
+      .references(() => organization.id, {
+        onDelete: 'cascade',
+      }),
+
+    firstName: text('first_name')
+      .notNull(),
+
+    paternalLastName: text('paternal_last_name'),
+
+    maternalLastName: text('maternal_last_name'),
+
+    birthDate: date('birth_date'),
+
+    sex: patientSexEnum('sex'),
+
+    phone: text('phone'),
+
+    email: text('email'),
+
+    createdAt: timestamp('created_at', {
+      withTimezone: true,
+    })
+      .defaultNow()
+      .notNull(),
+
+    updatedAt: timestamp('updated_at', {
+      withTimezone: true,
+    })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index('patient_organization_idx')
+      .on(table.organizationId),
+
+    index('patient_name_idx')
+      .on(
+        table.organizationId,
+        table.firstName,
+        table.paternalLastName,
+      ),
+  ],
+)
+
+export const patientHistory = pgTable(
+  'patient_history',
+  {
+    id: uuid('id')
+      .defaultRandom()
+      .primaryKey(),
+
+    patientId: uuid('patient_id')
+      .notNull()
+      .references(() => patient.id, {
+        onDelete: 'cascade',
+      }),
+
+    createdAt: timestamp('created_at', {
+      withTimezone: true,
+    })
+      .defaultNow()
+      .notNull(),
+
+    updatedAt: timestamp('updated_at', {
+      withTimezone: true,
+    })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex('patient_history_patient_unique')
+      .on(table.patientId),
+  ],
+)
+</file>
+
+<file path="src/shared/hooks/use-mobile.ts">
+import * as React from "react"
+
+const MOBILE_BREAKPOINT = 768
+
+export function useIsMobile() {
+  const [isMobile, setIsMobile] = React.useState<boolean | undefined>(undefined)
+
+  React.useEffect(() => {
+    const mql = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`)
+    const onChange = () => {
+      setIsMobile(window.innerWidth < MOBILE_BREAKPOINT)
+    }
+    mql.addEventListener("change", onChange)
+    setIsMobile(window.innerWidth < MOBILE_BREAKPOINT)
+    return () => mql.removeEventListener("change", onChange)
+  }, [])
+
+  return !!isMobile
+}
+</file>
+
+<file path="src/shared/lib/utils.ts">
+import { clsx, type ClassValue } from "clsx"
+import { twMerge } from "tailwind-merge"
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs))
+}
+</file>
+
+<file path="src/proxy.ts">
+import { getSessionCookie } from 'better-auth/cookies'
+import { NextResponse, type NextRequest } from 'next/server'
+
+export function proxy(request: NextRequest) {
+  const sessionCookie = getSessionCookie(request)
+
+  if (!sessionCookie) {
+    const loginUrl = new URL('/login', request.url)
+
+    const redirectTo =
+      request.nextUrl.pathname + request.nextUrl.search
+
+    loginUrl.searchParams.set('redirect', redirectTo)
+
+    return NextResponse.redirect(loginUrl)
+  }
+
+  return NextResponse.next()
+}
+
+export const config = {
+  matcher: ['/org/:path*'],
+}
+</file>
+
+</files>
