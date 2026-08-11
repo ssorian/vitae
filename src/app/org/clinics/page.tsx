@@ -3,30 +3,50 @@
 import { useState } from 'react'
 import { Pencil, Plus, Trash2 } from 'lucide-react'
 
-import { ClinicForm } from '#/modules/clinic/components/ClinicForm.tsx'
+import { ClinicForm } from '#/modules/clinic/components/ClinicForm'
 import {
   useArchiveClinic,
   useClinics,
-} from '#/modules/clinic/hooks/clinicQueries.ts'
-import type { ClinicInput } from '#/modules/clinic/schemas/clinic.ts'
+} from '#/modules/clinic/hooks/clinicQueries'
+import type { ClinicInput } from '#/modules/clinic/schemas/clinic'
 
-import { Button } from '#/shared/components/ui/button.tsx'
+import { Button } from '#/shared/components/ui/button'
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from '#/shared/components/ui/dialog.tsx'
+} from '#/shared/components/ui/dialog'
 
 import Link from 'next/link'
 
-type Clinic = ClinicInput & {
+type Clinic = Omit<
+  ClinicInput,
+  | 'phone'
+  | 'email'
+  | 'addressLine'
+  | 'neighborhood'
+  | 'municipality'
+  | 'state'
+  | 'postalCode'
+> & {
+  id: string
+  phone: string | null
+  email: string | null
+  addressLine: string | null
+  neighborhood: string | null
+  municipality: string | null
+  state: string | null
+  postalCode: string | null
+}
+
+type EditableClinic = ClinicInput & {
   id: string
 }
 
 export default function Clinics() {
-  const [editingClinic, setEditingClinic] = useState<Clinic | null>(null)
+  const [editingClinic, setEditingClinic] = useState<EditableClinic | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
 
   const clinics = useClinics()
@@ -38,7 +58,16 @@ export default function Clinics() {
   }
 
   function openEditDialog(clinic: Clinic) {
-    setEditingClinic(clinic)
+    setEditingClinic({
+      ...clinic,
+      phone: clinic.phone ?? undefined,
+      email: clinic.email ?? undefined,
+      addressLine: clinic.addressLine ?? undefined,
+      neighborhood: clinic.neighborhood ?? undefined,
+      municipality: clinic.municipality ?? undefined,
+      state: clinic.state ?? undefined,
+      postalCode: clinic.postalCode ?? undefined,
+    })
     setDialogOpen(true)
   }
 

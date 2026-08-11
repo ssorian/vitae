@@ -1,10 +1,10 @@
 /* eslint-disable react-hooks/static-components */
 import { useForm } from '@tanstack/react-form'
-import { useCreateClinic, useUpdateClinic } from '../hooks/clinicQueries.ts'
-import { clinicInputSchema, type ClinicInput } from '../schemas/clinic.ts'
-import { Button } from '#/shared/components/ui/button.tsx'
-import { Input } from '#/shared/components/ui/input.tsx'
-import { Label } from '#/shared/components/ui/label.tsx'
+import { useCreateClinic, useUpdateClinic } from '../hooks/clinicQueries'
+import { clinicInputSchema, type ClinicInput } from '../schemas/clinic'
+import { Button } from '#/shared/components/ui/button'
+import { Input } from '#/shared/components/ui/input'
+import { Label } from '#/shared/components/ui/label'
 
 export type ClinicFormValues = ClinicInput
 type Clinic = ClinicInput & { id: string }

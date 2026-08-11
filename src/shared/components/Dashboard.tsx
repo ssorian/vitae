@@ -5,13 +5,13 @@ import type { ReactNode } from 'react'
 import {
   SidebarInset,
   SidebarProvider,
-} from '#/shared/components/ui/sidebar.tsx'
+} from '#/shared/components/ui/sidebar'
 
-import { DashboardHeader } from './DashboardHeader.tsx'
+import { DashboardHeader } from './DashboardHeader'
 import {
   DashboardSidebar,
   type DashboardSidebarProps,
-} from './DashboardSidebar.tsx'
+} from './DashboardSidebar'
 
 type DashboardProps = DashboardSidebarProps & {
   children: ReactNode

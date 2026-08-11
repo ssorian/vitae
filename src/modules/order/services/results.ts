@@ -6,7 +6,8 @@ import { db } from '#/infrastructure/database'
 import { order, orderAsset, orderEvent, orderResult } from '#/modules/order/db/schema'
 import { ResultReadyEmail } from '#/modules/order/emails/ResultReadyEmail'
 
-const MAX_FILES = 10
+const MAX_IMAGE_FILES = 10
+const MAX_DICOM_FILES = 500
 const MAX_FILE_BYTES = 100 * 1024 * 1024
 const MAX_REQUEST_BYTES = 500 * 1024 * 1024
 const RESULTS_BUCKET = process.env.SUPABASE_RESULTS_BUCKET || 'order-results'
@@ -48,12 +49,15 @@ export async function uploadOrderResult(
   userId: string,
   input: { orderId: string; observations: string; realizedAt: Date; files: File[] },
 ) {
-  if (!input.files.length || input.files.length > MAX_FILES) throw new Error('INVALID_FILE_COUNT')
+  if (!input.files.length) throw new Error('INVALID_FILE_COUNT')
   const totalBytes = input.files.reduce((total, file) => total + file.size, 0)
   if (totalBytes > MAX_REQUEST_BYTES || input.files.some((file) => file.size > MAX_FILE_BYTES)) throw new Error('FILE_TOO_LARGE')
 
   const typedFiles = input.files.map((file) => ({ file, type: assetType(file) }))
   if (typedFiles.some(({ type }) => !type)) throw new Error('UNSUPPORTED_FILE_TYPE')
+  const dicomFiles = typedFiles.filter(({ type }) => type === 'dicom')
+  const imageFiles = typedFiles.filter(({ type }) => type === 'image')
+  if (dicomFiles.length > MAX_DICOM_FILES || imageFiles.length > MAX_IMAGE_FILES) throw new Error('INVALID_FILE_COUNT')
   if ((await Promise.all(typedFiles.map(({ file, type }) => hasValidMagicBytes(file, type!)))).some((valid) => !valid)) {
     throw new Error('INVALID_FILE_SIGNATURE')
   }
@@ -136,6 +140,29 @@ export async function getDoctorResult(orderId: string, email: string) {
   })
   if (!found || normalizeEmail(found.doctorClient.email) !== normalizeEmail(email) || found.results.length !== 1) return null
   return found
+}
+
+async function signedViewerAssets(assets: { id: string; name: string; type: string; storageKey: string }[]) {
+  return Promise.all(assets.filter((asset): asset is typeof asset & { type: 'dicom' | 'image' } => asset.type === 'dicom' || asset.type === 'image').map(async (asset) => {
+    const { data, error } = await storage().storage.from(RESULTS_BUCKET).createSignedUrl(asset.storageKey, 60)
+    if (error || !data) throw new Error(`RESULT_URL_FAILED:${error?.message ?? 'unknown'}`)
+    return { id: asset.id, name: asset.name, type: asset.type, url: data.signedUrl }
+  }))
+}
+
+export async function getOrganizationViewerAssets(organizationId: string, orderId: string) {
+  const found = await db.query.order.findFirst({
+    where: { id: orderId, organizationId },
+    with: { assets: true },
+  })
+  if (!found) return null
+  return { type: found.type, assets: await signedViewerAssets(found.assets) }
+}
+
+export async function getDoctorViewerAssets(orderId: string, email: string) {
+  const found = await getDoctorResult(orderId, email)
+  if (!found) return null
+  return { type: found.type, assets: await signedViewerAssets(found.assets) }
 }
 
 export async function getDoctorAssetUrl(orderId: string, assetId: string, email: string) {

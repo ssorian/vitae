@@ -1,9 +1,9 @@
 import { and, eq, isNull, asc } from 'drizzle-orm'
 
-import { db } from '#/infrastructure/database/index.ts'
+import { db } from '#/infrastructure/database/index'
 
-import { clinic } from '../db/schema.ts'
-import type { ClinicInput } from '../schemas/clinic.ts'
+import { clinic } from '../db/schema'
+import type { ClinicInput } from '../schemas/clinic'
 import { randomUUID } from 'crypto'
 
 export async function archiveClinic(organizationId: string, id: string) {

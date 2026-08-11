@@ -1,8 +1,8 @@
 import { Bell } from 'lucide-react'
 
-import { Button } from '#/shared/components/ui/button.tsx'
-import { Separator } from '#/shared/components/ui/separator.tsx'
-import { SidebarTrigger } from '#/shared/components/ui/sidebar.tsx'
+import { Button } from '#/shared/components/ui/button'
+import { Separator } from '#/shared/components/ui/separator'
+import { SidebarTrigger } from '#/shared/components/ui/sidebar'
 
 export function DashboardHeader() {
   return (

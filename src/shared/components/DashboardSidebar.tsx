@@ -14,7 +14,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from '#/shared/components/ui/sidebar.tsx'
+} from '#/shared/components/ui/sidebar'
 
 export type NavigationItem = {
   title: string

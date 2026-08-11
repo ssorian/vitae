@@ -23,7 +23,7 @@ export const clinicInputSchema = z.object({
   state: optionalText(120),
   postalCode: optionalText(20),
   timezone: z.string().trim().min(1, 'La zona horaria es obligatoria').max(100),
-  slotIntervalMinutes: z.number().int().min(5).max(120).default(15),
+  slotIntervalMinutes: z.number().int().min(5).max(120),
   status: z.enum(['active', 'inactive']),
 })
 

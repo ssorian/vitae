@@ -1,6 +1,6 @@
 import { integer, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core'
 
-import { organization } from '#/infrastructure/auth/db/schema.ts'
+import { organization } from '#/infrastructure/auth/db/schema'
 
 export const clinicStatusEnum = pgEnum('clinic_status', ['active', 'inactive'])
 
