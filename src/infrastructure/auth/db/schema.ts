@@ -1,4 +1,7 @@
-import { boolean, pgTable, text, timestamp, uniqueIndex, varchar } from 'drizzle-orm/pg-core'
+import { boolean, check, foreignKey, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core'
+import { sql } from 'drizzle-orm'
+import { clinic } from '#/modules/clinic/db/schema'
+import { patient } from '#/modules/patient/db/schema'
 
 export const user = pgTable('user', {
   id: text('id').primaryKey(),
@@ -6,6 +9,8 @@ export const user = pgTable('user', {
   email: text('email').notNull().unique(),
   emailVerified: boolean('email_verified').notNull(),
   image: text('image'),
+  username: text('username').unique(),
+  displayUsername: text('display_username'),
   createdAt: timestamp('created_at').notNull(),
   updatedAt: timestamp('updated_at').notNull(),
 })
@@ -24,8 +29,18 @@ export const member = pgTable("member", {
 	userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }),
 	organizationId: text("organization_id").notNull().references(() => organization.id, { onDelete: "cascade" }),
 	role: text("role").notNull(),
+	assignedClinicId: uuid("assigned_clinic_id"),
+	active: boolean("active").notNull().default(true),
 	createdAt: timestamp("created_at", { precision: 6, withTimezone: true }).notNull(),
-}, (table) => [uniqueIndex('member_id_organization_id_unique').on(table.id, table.organizationId)]);
+}, (table) => [
+  uniqueIndex('member_id_organization_id_unique').on(table.id, table.organizationId),
+  foreignKey({
+    columns: [table.assignedClinicId, table.organizationId],
+    foreignColumns: [clinic.id, clinic.organizationId],
+    name: 'member_assigned_clinic_organization_fk',
+  }),
+  check('member_assistant_assigned_clinic_check', sql`${table.role} <> 'assistant' OR ${table.assignedClinicId} IS NOT NULL`),
+]);
 
 export const invitation = pgTable("invitation", {
 	id: text("id").primaryKey(),
@@ -68,6 +83,43 @@ export const account = pgTable('account', {
   password: text('password'),
   createdAt: timestamp('created_at').notNull(),
   updatedAt: timestamp('updated_at').notNull(),
+})
+
+export const patientPortalInvitationDeliveryEnum = pgEnum('patient_portal_invitation_delivery', [
+  'email',
+  'printed',
+])
+
+export const patientAccount = pgTable('patient_account', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  patientId: uuid('patient_id')
+    .notNull()
+    .unique()
+    .references(() => patient.id, { onDelete: 'cascade' }),
+  userId: text('user_id')
+    .notNull()
+    .unique()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  verifiedAt: timestamp('verified_at', { withTimezone: true }),
+  revokedAt: timestamp('revoked_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+})
+
+export const patientPortalInvitation = pgTable('patient_portal_invitation', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  patientId: uuid('patient_id')
+    .notNull()
+    .references(() => patient.id, { onDelete: 'cascade' }),
+  tokenHash: text('token_hash').notNull().unique(),
+  delivery: patientPortalInvitationDeliveryEnum('delivery').notNull(),
+  createdByUserId: text('created_by_user_id')
+    .notNull()
+    .references(() => user.id),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  usedAt: timestamp('used_at', { withTimezone: true }),
+  revokedAt: timestamp('revoked_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 })
 
 export const verification = pgTable('verification', {

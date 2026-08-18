@@ -3,6 +3,9 @@
 import { headers } from 'next/headers'
 
 import { auth } from '#/infrastructure/auth/auth'
+import { db } from '#/infrastructure/database'
+import { member } from './db/schema'
+import { and, eq } from 'drizzle-orm'
 
 export async function requireOrganization() {
   const session = await initializeActiveOrganization()
@@ -15,6 +18,12 @@ export async function requireOrganization() {
 
   if (!organizationId) {
     throw new Error('ORGANIZATION_REQUIRED')
+  }
+
+  const [membership] = await db.select().from(member).where(and(eq(member.organizationId, organizationId), eq(member.userId, session.user.id), eq(member.active, true)))
+
+  if (!membership) {
+    throw new Error('FORBIDDEN')
   }
 
   return {

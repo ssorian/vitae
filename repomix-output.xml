@@ -120,6 +120,9 @@ src/
     patient/
       db/
         schema.ts
+    viewer/
+      browser-empty.ts
+      index.ts
   shared/
     hooks/
       use-mobile.ts
@@ -1158,57 +1161,6 @@ export async function updateDoctorClient(
 }
 </file>
 
-<file path="src/modules/clinic/db/schema.ts">
-import { integer, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core'
-
-import { organization } from '#/infrastructure/auth/db/schema.ts'
-
-export const clinicStatusEnum = pgEnum('clinic_status', ['active', 'inactive'])
-
-export const clinic = pgTable('clinic', {
-  id: uuid('id').primaryKey().defaultRandom(),
-
-  organizationId: text('organization_id')
-    .notNull()
-    .references(() => organization.id, { onDelete: 'cascade' }),
-
-  name: text('name').notNull(),
-
-  publicSlug: text('public_slug').notNull().unique(),
-
-  phone: text('phone'),
-  email: text('email'),
-
-  addressLine: text('address_line'),
-  neighborhood: text('neighborhood'),
-  municipality: text('municipality'),
-  state: text('state'),
-  postalCode: text('postal_code'),
-
-  timezone: text('timezone').notNull().default('America/Mexico_City'),
-
-  slotIntervalMinutes: integer('slot_interval_minutes').notNull().default(15),
-
-  status: clinicStatusEnum('status').notNull().default('active'),
-
-  createdAt: timestamp('created_at', {
-    withTimezone: true,
-  })
-    .notNull()
-    .defaultNow(),
-
-  updatedAt: timestamp('updated_at', {
-    withTimezone: true,
-  })
-    .notNull()
-    .defaultNow(),
-
-  archivedAt: timestamp('archived_at', { withTimezone: true }),
-}, (table) => [
-  uniqueIndex('clinic_id_organization_id_unique').on(table.id, table.organizationId),
-])
-</file>
-
 <file path="src/modules/clinic/hooks/clinicQueries.ts">
 'use client'
 
@@ -1285,47 +1237,6 @@ export function useArchiveClinic() {
 }
 </file>
 
-<file path="src/modules/clinic/schemas/clinic.ts">
-import { z } from 'zod'
-
-const optionalText = (max: number) =>
-  z
-    .string()
-    .trim()
-    .max(max)
-    .transform((value) => value || undefined)
-    .optional()
-
-export const clinicInputSchema = z.object({
-  name: z.string().trim().min(1, 'El nombre es obligatorio').max(120),
-  phone: optionalText(30),
-  email: z
-    .email('El correo no es válido')
-    .max(255)
-    .or(z.literal(''))
-    .transform((value) => value || undefined)
-    .optional(),
-  addressLine: optionalText(255),
-  neighborhood: optionalText(120),
-  municipality: optionalText(120),
-  state: optionalText(120),
-  postalCode: optionalText(20),
-  timezone: z.string().trim().min(1, 'La zona horaria es obligatoria').max(100),
-  slotIntervalMinutes: z.number().int().min(5).max(120).default(15),
-  status: z.enum(['active', 'inactive']),
-})
-
-export const clinicIdSchema = z.object({
-  id: z.uuid(),
-})
-
-export const updateClinicSchema = clinicInputSchema.extend({
-  id: z.uuid(),
-})
-
-export type ClinicInput = z.infer<typeof clinicInputSchema>
-</file>
-
 <file path="src/modules/clinic/server/clinic.ts">
 'use server'
 
@@ -1398,85 +1309,6 @@ export async function archiveClinicAction(input: unknown) {
   revalidatePath('/org/clinics')
 
   return clinic
-}
-</file>
-
-<file path="src/modules/clinic/services/clinic.ts">
-import { and, eq, isNull, asc } from 'drizzle-orm'
-
-import { db } from '#/infrastructure/database/index.ts'
-
-import { clinic } from '../db/schema.ts'
-import type { ClinicInput } from '../schemas/clinic.ts'
-import { randomUUID } from 'crypto'
-
-export async function archiveClinic(organizationId: string, id: string) {
-  const [archivedClinic] = await db
-    .update(clinic)
-    .set({ archivedAt: new Date(), updatedAt: new Date() })
-    .where(
-      and(
-        eq(clinic.id, id),
-        eq(clinic.organizationId, organizationId),
-        isNull(clinic.archivedAt),
-      ),
-    )
-    .returning()
-
-  return archivedClinic
-}
-
-export function listClinics(organizationId: string) {
-  return db
-    .select()
-    .from(clinic)
-    .where(
-      and(eq(clinic.organizationId, organizationId), isNull(clinic.archivedAt)),
-    )
-    .orderBy(asc(clinic.name))
-}
-
-
-export async function createClinic(
-  organizationId: string,
-  input: ClinicInput,
-) {
-  const [createdClinic] = await db
-    .insert(clinic)
-    .values({ ...input, organizationId, publicSlug: `${toSlug(input.name)}-${randomUUID().slice(0, 8)}` })
-    .returning()
-
-  return createdClinic
-}
-
-function toSlug(value: string) {
-  return value
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '') || 'clinica'
-}
-
-
-export async function updateClinic(
-  organizationId: string,
-  id: string,
-  input: ClinicInput,
-) {
-  const [updatedClinic] = await db
-    .update(clinic)
-    .set({ ...input, updatedAt: new Date() })
-    .where(
-      and(
-        eq(clinic.id, id),
-        eq(clinic.organizationId, organizationId),
-        isNull(clinic.archivedAt),
-      ),
-    )
-    .returning()
-
-  return updatedClinic
 }
 </file>
 
@@ -2282,157 +2114,6 @@ export async function deliverOrderResults(
 }
 </file>
 
-<file path="src/modules/order/services/results.ts">
-import { and, eq } from 'drizzle-orm'
-import { createClient } from '@supabase/supabase-js'
-import { Resend } from 'resend'
-
-import { db } from '#/infrastructure/database'
-import { order, orderAsset, orderEvent, orderResult } from '#/modules/order/db/schema'
-import { ResultReadyEmail } from '#/modules/order/emails/ResultReadyEmail'
-
-const MAX_FILES = 10
-const MAX_FILE_BYTES = 100 * 1024 * 1024
-const MAX_REQUEST_BYTES = 500 * 1024 * 1024
-const RESULTS_BUCKET = process.env.SUPABASE_RESULTS_BUCKET || 'order-results'
-
-function requiredEnv(name: 'SUPABASE_URL' | 'SUPABASE_SERVICE_ROLE_KEY' | 'RESEND_API_KEY' | 'RESEND_FROM_EMAIL') {
-  const value = process.env[name]
-  if (!value) throw new Error(`RESULT_DELIVERY_CONFIG_MISSING:${name}`)
-  return value
-}
-
-function storage() {
-  return createClient(
-    requiredEnv('SUPABASE_URL'),
-    requiredEnv('SUPABASE_SERVICE_ROLE_KEY'),
-    { auth: { persistSession: false } },
-  )
-}
-
-function normalizeEmail(email: string) {
-  return email.trim().toLowerCase()
-}
-
-function assetType(file: File): 'image' | 'dicom' | null {
-  const name = file.name.toLowerCase()
-  if (file.type === 'image/jpeg' && /\.jpe?g$/.test(name)) return 'image'
-  if ((file.type === 'application/dicom' || file.type === 'application/dicom+json' || !file.type) && /\.(dcm|dicom)$/.test(name)) return 'dicom'
-  return null
-}
-
-async function hasValidMagicBytes(file: File, type: 'image' | 'dicom') {
-  const bytes = new Uint8Array(await file.slice(0, type === 'dicom' ? 132 : 3).arrayBuffer())
-  return type === 'image'
-    ? bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff
-    : bytes[128] === 0x44 && bytes[129] === 0x49 && bytes[130] === 0x43 && bytes[131] === 0x4d
-}
-
-export async function uploadOrderResult(
-  organizationId: string,
-  userId: string,
-  input: { orderId: string; observations: string; realizedAt: Date; files: File[] },
-) {
-  if (!input.files.length || input.files.length > MAX_FILES) throw new Error('INVALID_FILE_COUNT')
-  const totalBytes = input.files.reduce((total, file) => total + file.size, 0)
-  if (totalBytes > MAX_REQUEST_BYTES || input.files.some((file) => file.size > MAX_FILE_BYTES)) throw new Error('FILE_TOO_LARGE')
-
-  const typedFiles = input.files.map((file) => ({ file, type: assetType(file) }))
-  if (typedFiles.some(({ type }) => !type)) throw new Error('UNSUPPORTED_FILE_TYPE')
-  if ((await Promise.all(typedFiles.map(({ file, type }) => hasValidMagicBytes(file, type!)))).some((valid) => !valid)) {
-    throw new Error('INVALID_FILE_SIGNATURE')
-  }
-
-  const existing = await db.query.order.findFirst({
-    where: { id: input.orderId, organizationId },
-    with: { results: true },
-  })
-  if (!existing) throw new Error('ORDER_NOT_FOUND')
-  if (existing.results.length) throw new Error('RESULT_ALREADY_FINALIZED')
-  if (existing.status === 'delivered' || existing.status === 'cancelled') throw new Error('ORDER_NOT_ACCEPTING_RESULTS')
-
-  const supabase = storage()
-  const uploaded: { name: string; storageKey: string; type: 'image' | 'dicom'; metadata: Record<string, unknown> }[] = []
-  for (const { file, type } of typedFiles) {
-    const storageKey = `${organizationId}/${input.orderId}/${crypto.randomUUID()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
-    const { error } = await supabase.storage.from(RESULTS_BUCKET).upload(storageKey, file, {
-      contentType: file.type || 'application/dicom',
-      upsert: false,
-    })
-    if (error) throw new Error(`RESULT_UPLOAD_FAILED:${error.message}`)
-    uploaded.push({ name: file.name, storageKey, type: type!, metadata: { size: file.size } })
-  }
-
-  return db.transaction(async (tx) => {
-    const alreadyFinalized = await tx.query.orderResult.findFirst({ where: { orderId: input.orderId } })
-    if (alreadyFinalized) throw new Error('RESULT_ALREADY_FINALIZED')
-
-    const [result] = await tx.insert(orderResult).values({
-      orderId: input.orderId,
-      observations: input.observations,
-      realizedAt: input.realizedAt,
-      finalizedAt: new Date(),
-      finalizedByUserId: userId,
-    }).returning()
-
-    const assets = await tx.insert(orderAsset).values(uploaded.map((asset) => ({ orderId: input.orderId, ...asset }))).returning()
-    await tx.update(order).set({ status: 'ready', updatedAt: new Date() }).where(eq(order.id, input.orderId))
-    await tx.insert(orderEvent).values([
-      ...assets.map((asset) => ({ orderId: input.orderId, type: 'result.uploaded' as const, userId, metadata: { assetId: asset.id, name: asset.name } })),
-      { orderId: input.orderId, type: 'result.finalized', userId, metadata: { resultId: result.id } },
-    ])
-    return { result, assets }
-  })
-}
-
-export async function deliverOrderResults(organizationId: string, orderId: string, userId: string) {
-  const existing = await db.query.order.findFirst({
-    where: { id: orderId, organizationId },
-    with: { doctorClient: true, results: true },
-  })
-  if (!existing) throw new Error('ORDER_NOT_FOUND')
-  if (existing.status !== 'ready' || !existing.results.length) throw new Error('ORDER_NOT_READY')
-
-  const resend = new Resend(requiredEnv('RESEND_API_KEY'))
-  const { error } = await resend.emails.send({
-    from: requiredEnv('RESEND_FROM_EMAIL'),
-    to: existing.doctorClient.email,
-    subject: `Resultados de estudio listos - Folio ${existing.folio}`,
-    react: ResultReadyEmail({ folio: existing.folio, resultUrl: `${process.env.BETTER_AUTH_URL}/portal/results/${orderId}` }),
-  })
-  if (error) throw new Error(`RESULT_EMAIL_FAILED:${error.message}`)
-
-  return db.transaction(async (tx) => {
-    const [updated] = await tx.update(order).set({ status: 'delivered', deliveredAt: new Date(), updatedAt: new Date() })
-      .where(and(eq(order.id, orderId), eq(order.status, 'ready'))).returning()
-    if (!updated) throw new Error('ORDER_NOT_READY')
-    await tx.insert(orderEvent).values([
-      { orderId, type: 'email.sent', userId, metadata: { to: existing.doctorClient.email, subject: `Resultados de estudio listos - Folio ${existing.folio}`, secureLink: `/portal/results/${orderId}` } },
-      { orderId, type: 'order.delivered', userId, metadata: {} },
-    ])
-    return updated
-  })
-}
-
-export async function getDoctorResult(orderId: string, email: string) {
-  const found = await db.query.order.findFirst({
-    where: { id: orderId, status: 'delivered' },
-    with: { doctorClient: true, results: true, assets: true },
-  })
-  if (!found || normalizeEmail(found.doctorClient.email) !== normalizeEmail(email) || found.results.length !== 1) return null
-  return found
-}
-
-export async function getDoctorAssetUrl(orderId: string, assetId: string, email: string) {
-  const found = await getDoctorResult(orderId, email)
-  const asset = found?.assets.find((item) => item.id === assetId)
-  if (!asset) return null
-  const { data, error } = await storage().storage.from(RESULTS_BUCKET).createSignedUrl(asset.storageKey, 60)
-  if (error || !data) throw new Error(`RESULT_URL_FAILED:${error?.message ?? 'unknown'}`)
-  return data.signedUrl
-}
-</file>
-
 <file path="src/modules/patient/db/schema.ts">
 import {
   date,
@@ -2539,6 +2220,14 @@ export const patientHistory = pgTable(
 )
 </file>
 
+<file path="src/modules/viewer/browser-empty.ts">
+export {};
+</file>
+
+<file path="src/modules/viewer/index.ts">
+export { Viewer, type ViewerAsset, type ViewerProps } from './Viewer'
+</file>
+
 <file path="src/shared/hooks/use-mobile.ts">
 import * as React from "react"
 
@@ -2593,6 +2282,355 @@ export function proxy(request: NextRequest) {
 
 export const config = {
   matcher: ['/org/:path*'],
+}
+</file>
+
+<file path="src/modules/clinic/db/schema.ts">
+import { integer, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core'
+
+import { organization } from '#/infrastructure/auth/db/schema'
+
+export const clinicStatusEnum = pgEnum('clinic_status', ['active', 'inactive'])
+
+export const clinic = pgTable('clinic', {
+  id: uuid('id').primaryKey().defaultRandom(),
+
+  organizationId: text('organization_id')
+    .notNull()
+    .references(() => organization.id, { onDelete: 'cascade' }),
+
+  name: text('name').notNull(),
+
+  publicSlug: text('public_slug').notNull().unique(),
+
+  phone: text('phone'),
+  email: text('email'),
+
+  addressLine: text('address_line'),
+  neighborhood: text('neighborhood'),
+  municipality: text('municipality'),
+  state: text('state'),
+  postalCode: text('postal_code'),
+
+  timezone: text('timezone').notNull().default('America/Mexico_City'),
+
+  slotIntervalMinutes: integer('slot_interval_minutes').notNull().default(15),
+
+  status: clinicStatusEnum('status').notNull().default('active'),
+
+  createdAt: timestamp('created_at', {
+    withTimezone: true,
+  })
+    .notNull()
+    .defaultNow(),
+
+  updatedAt: timestamp('updated_at', {
+    withTimezone: true,
+  })
+    .notNull()
+    .defaultNow(),
+
+  archivedAt: timestamp('archived_at', { withTimezone: true }),
+}, (table) => [
+  uniqueIndex('clinic_id_organization_id_unique').on(table.id, table.organizationId),
+])
+</file>
+
+<file path="src/modules/clinic/schemas/clinic.ts">
+import { z } from 'zod'
+
+const optionalText = (max: number) =>
+  z
+    .string()
+    .trim()
+    .max(max)
+    .transform((value) => value || undefined)
+    .optional()
+
+export const clinicInputSchema = z.object({
+  name: z.string().trim().min(1, 'El nombre es obligatorio').max(120),
+  phone: optionalText(30),
+  email: z
+    .email('El correo no es válido')
+    .max(255)
+    .or(z.literal(''))
+    .transform((value) => value || undefined)
+    .optional(),
+  addressLine: optionalText(255),
+  neighborhood: optionalText(120),
+  municipality: optionalText(120),
+  state: optionalText(120),
+  postalCode: optionalText(20),
+  timezone: z.string().trim().min(1, 'La zona horaria es obligatoria').max(100),
+  slotIntervalMinutes: z.number().int().min(5).max(120),
+  status: z.enum(['active', 'inactive']),
+})
+
+export const clinicIdSchema = z.object({
+  id: z.uuid(),
+})
+
+export const updateClinicSchema = clinicInputSchema.extend({
+  id: z.uuid(),
+})
+
+export type ClinicInput = z.infer<typeof clinicInputSchema>
+</file>
+
+<file path="src/modules/clinic/services/clinic.ts">
+import { and, eq, isNull, asc } from 'drizzle-orm'
+
+import { db } from '#/infrastructure/database/index'
+
+import { clinic } from '../db/schema'
+import type { ClinicInput } from '../schemas/clinic'
+import { randomUUID } from 'crypto'
+
+export async function archiveClinic(organizationId: string, id: string) {
+  const [archivedClinic] = await db
+    .update(clinic)
+    .set({ archivedAt: new Date(), updatedAt: new Date() })
+    .where(
+      and(
+        eq(clinic.id, id),
+        eq(clinic.organizationId, organizationId),
+        isNull(clinic.archivedAt),
+      ),
+    )
+    .returning()
+
+  return archivedClinic
+}
+
+export function listClinics(organizationId: string) {
+  return db
+    .select()
+    .from(clinic)
+    .where(
+      and(eq(clinic.organizationId, organizationId), isNull(clinic.archivedAt)),
+    )
+    .orderBy(asc(clinic.name))
+}
+
+
+export async function createClinic(
+  organizationId: string,
+  input: ClinicInput,
+) {
+  const [createdClinic] = await db
+    .insert(clinic)
+    .values({ ...input, organizationId, publicSlug: `${toSlug(input.name)}-${randomUUID().slice(0, 8)}` })
+    .returning()
+
+  return createdClinic
+}
+
+function toSlug(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'clinica'
+}
+
+
+export async function updateClinic(
+  organizationId: string,
+  id: string,
+  input: ClinicInput,
+) {
+  const [updatedClinic] = await db
+    .update(clinic)
+    .set({ ...input, updatedAt: new Date() })
+    .where(
+      and(
+        eq(clinic.id, id),
+        eq(clinic.organizationId, organizationId),
+        isNull(clinic.archivedAt),
+      ),
+    )
+    .returning()
+
+  return updatedClinic
+}
+</file>
+
+<file path="src/modules/order/services/results.ts">
+import { and, eq } from 'drizzle-orm'
+import { createClient } from '@supabase/supabase-js'
+import { Resend } from 'resend'
+
+import { db } from '#/infrastructure/database'
+import { order, orderAsset, orderEvent, orderResult } from '#/modules/order/db/schema'
+import { ResultReadyEmail } from '#/modules/order/emails/ResultReadyEmail'
+
+const MAX_IMAGE_FILES = 10
+const MAX_DICOM_FILES = 500
+const MAX_FILE_BYTES = 100 * 1024 * 1024
+const MAX_REQUEST_BYTES = 500 * 1024 * 1024
+const RESULTS_BUCKET = process.env.SUPABASE_RESULTS_BUCKET || 'order-results'
+
+function requiredEnv(name: 'SUPABASE_URL' | 'SUPABASE_SERVICE_ROLE_KEY' | 'RESEND_API_KEY' | 'RESEND_FROM_EMAIL') {
+  const value = process.env[name]
+  if (!value) throw new Error(`RESULT_DELIVERY_CONFIG_MISSING:${name}`)
+  return value
+}
+
+function storage() {
+  return createClient(
+    requiredEnv('SUPABASE_URL'),
+    requiredEnv('SUPABASE_SERVICE_ROLE_KEY'),
+    { auth: { persistSession: false } },
+  )
+}
+
+function normalizeEmail(email: string) {
+  return email.trim().toLowerCase()
+}
+
+function assetType(file: File): 'image' | 'dicom' | null {
+  const name = file.name.toLowerCase()
+  if (file.type === 'image/jpeg' && /\.jpe?g$/.test(name)) return 'image'
+  if ((file.type === 'application/dicom' || file.type === 'application/dicom+json' || !file.type) && /\.(dcm|dicom)$/.test(name)) return 'dicom'
+  return null
+}
+
+async function hasValidMagicBytes(file: File, type: 'image' | 'dicom') {
+  const bytes = new Uint8Array(await file.slice(0, type === 'dicom' ? 132 : 3).arrayBuffer())
+  return type === 'image'
+    ? bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff
+    : bytes[128] === 0x44 && bytes[129] === 0x49 && bytes[130] === 0x43 && bytes[131] === 0x4d
+}
+
+export async function uploadOrderResult(
+  organizationId: string,
+  userId: string,
+  input: { orderId: string; observations: string; realizedAt: Date; files: File[] },
+) {
+  if (!input.files.length) throw new Error('INVALID_FILE_COUNT')
+  const totalBytes = input.files.reduce((total, file) => total + file.size, 0)
+  if (totalBytes > MAX_REQUEST_BYTES || input.files.some((file) => file.size > MAX_FILE_BYTES)) throw new Error('FILE_TOO_LARGE')
+
+  const typedFiles = input.files.map((file) => ({ file, type: assetType(file) }))
+  if (typedFiles.some(({ type }) => !type)) throw new Error('UNSUPPORTED_FILE_TYPE')
+  const dicomFiles = typedFiles.filter(({ type }) => type === 'dicom')
+  const imageFiles = typedFiles.filter(({ type }) => type === 'image')
+  if (dicomFiles.length > MAX_DICOM_FILES || imageFiles.length > MAX_IMAGE_FILES) throw new Error('INVALID_FILE_COUNT')
+  if ((await Promise.all(typedFiles.map(({ file, type }) => hasValidMagicBytes(file, type!)))).some((valid) => !valid)) {
+    throw new Error('INVALID_FILE_SIGNATURE')
+  }
+
+  const existing = await db.query.order.findFirst({
+    where: { id: input.orderId, organizationId },
+    with: { results: true },
+  })
+  if (!existing) throw new Error('ORDER_NOT_FOUND')
+  if (existing.results.length) throw new Error('RESULT_ALREADY_FINALIZED')
+  if (existing.status === 'delivered' || existing.status === 'cancelled') throw new Error('ORDER_NOT_ACCEPTING_RESULTS')
+
+  const supabase = storage()
+  const uploaded: { name: string; storageKey: string; type: 'image' | 'dicom'; metadata: Record<string, unknown> }[] = []
+  for (const { file, type } of typedFiles) {
+    const storageKey = `${organizationId}/${input.orderId}/${crypto.randomUUID()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
+    const { error } = await supabase.storage.from(RESULTS_BUCKET).upload(storageKey, file, {
+      contentType: file.type || 'application/dicom',
+      upsert: false,
+    })
+    if (error) throw new Error(`RESULT_UPLOAD_FAILED:${error.message}`)
+    uploaded.push({ name: file.name, storageKey, type: type!, metadata: { size: file.size } })
+  }
+
+  return db.transaction(async (tx) => {
+    const alreadyFinalized = await tx.query.orderResult.findFirst({ where: { orderId: input.orderId } })
+    if (alreadyFinalized) throw new Error('RESULT_ALREADY_FINALIZED')
+
+    const [result] = await tx.insert(orderResult).values({
+      orderId: input.orderId,
+      observations: input.observations,
+      realizedAt: input.realizedAt,
+      finalizedAt: new Date(),
+      finalizedByUserId: userId,
+    }).returning()
+
+    const assets = await tx.insert(orderAsset).values(uploaded.map((asset) => ({ orderId: input.orderId, ...asset }))).returning()
+    await tx.update(order).set({ status: 'ready', updatedAt: new Date() }).where(eq(order.id, input.orderId))
+    await tx.insert(orderEvent).values([
+      ...assets.map((asset) => ({ orderId: input.orderId, type: 'result.uploaded' as const, userId, metadata: { assetId: asset.id, name: asset.name } })),
+      { orderId: input.orderId, type: 'result.finalized', userId, metadata: { resultId: result.id } },
+    ])
+    return { result, assets }
+  })
+}
+
+export async function deliverOrderResults(organizationId: string, orderId: string, userId: string) {
+  const existing = await db.query.order.findFirst({
+    where: { id: orderId, organizationId },
+    with: { doctorClient: true, results: true },
+  })
+  if (!existing) throw new Error('ORDER_NOT_FOUND')
+  if (existing.status !== 'ready' || !existing.results.length) throw new Error('ORDER_NOT_READY')
+
+  const resend = new Resend(requiredEnv('RESEND_API_KEY'))
+  const { error } = await resend.emails.send({
+    from: requiredEnv('RESEND_FROM_EMAIL'),
+    to: existing.doctorClient.email,
+    subject: `Resultados de estudio listos - Folio ${existing.folio}`,
+    react: ResultReadyEmail({ folio: existing.folio, resultUrl: `${process.env.BETTER_AUTH_URL}/portal/results/${orderId}` }),
+  })
+  if (error) throw new Error(`RESULT_EMAIL_FAILED:${error.message}`)
+
+  return db.transaction(async (tx) => {
+    const [updated] = await tx.update(order).set({ status: 'delivered', deliveredAt: new Date(), updatedAt: new Date() })
+      .where(and(eq(order.id, orderId), eq(order.status, 'ready'))).returning()
+    if (!updated) throw new Error('ORDER_NOT_READY')
+    await tx.insert(orderEvent).values([
+      { orderId, type: 'email.sent', userId, metadata: { to: existing.doctorClient.email, subject: `Resultados de estudio listos - Folio ${existing.folio}`, secureLink: `/portal/results/${orderId}` } },
+      { orderId, type: 'order.delivered', userId, metadata: {} },
+    ])
+    return updated
+  })
+}
+
+export async function getDoctorResult(orderId: string, email: string) {
+  const found = await db.query.order.findFirst({
+    where: { id: orderId, status: 'delivered' },
+    with: { doctorClient: true, results: true, assets: true },
+  })
+  if (!found || normalizeEmail(found.doctorClient.email) !== normalizeEmail(email) || found.results.length !== 1) return null
+  return found
+}
+
+async function signedViewerAssets(assets: { id: string; name: string; type: string; storageKey: string }[]) {
+  return Promise.all(assets.filter((asset): asset is typeof asset & { type: 'dicom' | 'image' } => asset.type === 'dicom' || asset.type === 'image').map(async (asset) => {
+    const { data, error } = await storage().storage.from(RESULTS_BUCKET).createSignedUrl(asset.storageKey, 60)
+    if (error || !data) throw new Error(`RESULT_URL_FAILED:${error?.message ?? 'unknown'}`)
+    return { id: asset.id, name: asset.name, type: asset.type, url: data.signedUrl }
+  }))
+}
+
+export async function getOrganizationViewerAssets(organizationId: string, orderId: string) {
+  const found = await db.query.order.findFirst({
+    where: { id: orderId, organizationId },
+    with: { assets: true },
+  })
+  if (!found) return null
+  return { type: found.type, assets: await signedViewerAssets(found.assets) }
+}
+
+export async function getDoctorViewerAssets(orderId: string, email: string) {
+  const found = await getDoctorResult(orderId, email)
+  if (!found) return null
+  return { type: found.type, assets: await signedViewerAssets(found.assets) }
+}
+
+export async function getDoctorAssetUrl(orderId: string, assetId: string, email: string) {
+  const found = await getDoctorResult(orderId, email)
+  const asset = found?.assets.find((item) => item.id === assetId)
+  if (!asset) return null
+  const { data, error } = await storage().storage.from(RESULTS_BUCKET).createSignedUrl(asset.storageKey, 60)
+  if (error || !data) throw new Error(`RESULT_URL_FAILED:${error?.message ?? 'unknown'}`)
+  return data.signedUrl
 }
 </file>
 

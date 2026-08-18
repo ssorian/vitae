@@ -56,6 +56,26 @@ export function SignupForm({
     }
   }
 
+  async function handleGoogleSignUp() {
+    setError(null)
+    setIsPending(true)
+
+    try {
+      const result = await authClient.signIn.social({
+        provider: 'google',
+        callbackURL: redirectTo,
+      })
+
+      if (result.error) {
+        setError('Unable to continue with Google. Please try again.')
+      }
+    } catch {
+      setError('Unable to continue with Google. Please try again.')
+    } finally {
+      setIsPending(false)
+    }
+  }
+
   return (
     <Card>
       <CardContent>
@@ -125,6 +145,15 @@ export function SignupForm({
               disabled={isPending}
             >
               {isPending ? 'Creating account…' : 'Create account'}
+            </Button>
+
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isPending}
+              onClick={handleGoogleSignUp}
+            >
+              Continue with Google
             </Button>
 
             <FieldDescription>

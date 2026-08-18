@@ -22,7 +22,7 @@ export const orderStatus = pgEnum('order_status', ['draft', 'received', 'schedul
 export const order = pgTable('order', {
   id: uuid('id').defaultRandom().primaryKey(),
   organizationId: text('organization_id').notNull().references(() => organization.id, { onDelete: 'cascade' }),
-  doctorClientId: uuid('doctor_client_id').notNull().references(() => doctorClient.id),
+  doctorClientId: uuid('doctor_client_id').references(() => doctorClient.id),
   patientHistoryId: uuid('patient_history_id').notNull().references(() => patientHistory.id),
   clinicId: uuid('clinic_id').notNull().references(() => clinic.id),
   folio: text('folio').notNull(),
@@ -46,6 +46,7 @@ export const order = pgTable('order', {
 ])
 
 export const orderAssetType = pgEnum('order_asset_type', ['pdf', 'image', 'dicom', 'zip', 'other'])
+export const orderResultGrantKind = pgEnum('order_result_grant_kind', ['email', 'code'])
 export const orderEventType = pgEnum('order_event_type', ['order.created', 'order.scheduled', 'order.started', 'result.uploaded', 'result.finalized', 'email.sent', 'order.delivered', 'order.cancelled'])
 
 export const orderResult = pgTable('order_result', {
@@ -71,6 +72,20 @@ export const orderAsset = pgTable('order_asset', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [index('order_asset_order_idx').on(table.orderId)])
+
+export const orderResultGrant = pgTable('order_result_grant', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  orderId: uuid('order_id').notNull().references(() => order.id, { onDelete: 'cascade' }),
+  kind: orderResultGrantKind('kind').notNull(),
+  secretHash: text('secret_hash').notNull().unique(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  revokedAt: timestamp('revoked_at', { withTimezone: true }),
+  createdByUserId: text('created_by_user_id').references(() => user.id, { onDelete: 'set null' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  index('order_result_grant_order_idx').on(table.orderId),
+  uniqueIndex('order_result_grant_order_kind_unique').on(table.orderId, table.kind),
+])
 
 export const orderEvent = pgTable('order_event', {
   id: uuid('id').defaultRandom().primaryKey(),

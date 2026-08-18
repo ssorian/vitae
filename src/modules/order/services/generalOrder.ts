@@ -47,6 +47,9 @@ export async function createOrder({
     if (!clinicRecord) {
       throw new Error('CLINIC_NOT_FOUND')
     }
+    if (!clinicRecord.laboratoryEnabled) {
+      throw new Error('LABORATORY_DISABLED')
+    }
 
     /*
      * 1. Find or create DoctorClient
@@ -199,9 +202,9 @@ export async function createOrder({
   })
 }
 
-export async function listOrders(organizationId: string) {
+export async function listOrders(organizationId: string, clinicId?: string) {
   return db.query.order.findMany({
-    where: { organizationId },
+    where: clinicId ? { organizationId, clinicId } : { organizationId },
     with: {
       doctorClient: true,
       patientHistory: {
@@ -393,6 +396,7 @@ export async function deliverOrderResults(
       },
       with: {
         doctorClient: true,
+        patientHistory: { with: { patient: true } },
       },
     })
 
@@ -402,6 +406,11 @@ export async function deliverOrderResults(
 
     if (existingOrder.status !== 'ready') {
       throw new Error('ORDER_NOT_READY')
+    }
+
+    const recipient = existingOrder.doctorClient?.email ?? existingOrder.patientHistory?.patient?.email
+    if (!recipient) {
+      throw new Error('ORDER_CONTACT_EMAIL_REQUIRED')
     }
 
     const [updatedOrder] = await tx
@@ -419,7 +428,7 @@ export async function deliverOrderResults(
       type: 'email.sent',
       userId,
       metadata: {
-        to: existingOrder.doctorClient.email,
+        to: recipient,
         subject: `Resultados de estudio listo - Folio ${existingOrder.folio}`,
         secureLink: `/orders/results/${orderId}`,
       },
@@ -432,7 +441,7 @@ export async function deliverOrderResults(
       metadata: {},
     })
 
-    console.log(`[MOCK EMAIL] Enviando correo a ${existingOrder.doctorClient.email} para orden Folio ${existingOrder.folio}`)
+    console.log(`[MOCK EMAIL] Enviando correo a ${recipient} para orden Folio ${existingOrder.folio}`)
 
     return updatedOrder
   })

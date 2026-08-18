@@ -181,7 +181,7 @@ export default function Clinics() {
               </div>
 
               <Button asChild className="mt-4">
-                <Link href={`/dashboard/clinics/${clinic.id}`}>
+                <Link href={`/clinics/${clinic.id}`}>
                   Entrar a clínica
                 </Link>
               </Button>

@@ -1,8 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { Check, ClipboardList, Eye, FileSpreadsheet, FileText, Landmark, User, Users } from 'lucide-react'
+import { Check, ClipboardList, FileSpreadsheet } from 'lucide-react'
 
 import { Button } from '#/shared/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '#/shared/components/ui/card'
@@ -10,6 +9,8 @@ import { Input } from '#/shared/components/ui/input'
 import { Label } from '#/shared/components/ui/label'
 import { NativeSelect } from '#/shared/components/ui/native-select'
 import { Textarea } from '#/shared/components/ui/textarea'
+
+import AppointmentWizardFrame from './AppointmentWizardFrame'
 
 import {
   createPublicOrderAction,
@@ -23,9 +24,13 @@ type Clinic = {
   addressLine: string | null
 }
 
-export default function PublicOrderWizard() {
-  const router = useRouter()
+type ProfessionalOrderWizardProps = {
+  onBack: () => void
+}
 
+const steps = ['Profesional', 'Paciente', 'Clínica', 'Estudio', 'Detalles', 'Revisión', 'Confirmación']
+
+export default function ProfessionalOrderWizard({ onBack }: ProfessionalOrderWizardProps) {
   // Steps: 1 (Doctor), 2 (Patient), 3 (Clinic), 4 (Study Type), 5 (Study Details), 6 (Review), 7 (Success)
   const [step, setStep] = useState(1)
   const [clinics, setClinics] = useState<Clinic[]>([])
@@ -179,20 +184,12 @@ export default function PublicOrderWizard() {
     }
   }
 
-  const stepsList = [
-    { num: 1, label: 'Doctor', icon: User },
-    { num: 2, label: 'Paciente', icon: Users },
-    { num: 3, label: 'Clínica', icon: Landmark },
-    { num: 4, label: 'Estudio', icon: ClipboardList },
-    { num: 5, label: 'Detalles', icon: FileText },
-    { num: 6, label: 'Revisión', icon: Eye },
-  ]
-
   if (step === 7 && successInfo) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-50/50 p-6 dark:bg-zinc-950">
-        <Card className="w-full max-w-xl border-zinc-200 shadow-xl dark:border-zinc-800">
-          <CardContent className="pt-10 text-center space-y-6">
+      <AppointmentWizardFrame title="Solicitud de estudios clínicos" subtitle="Tu solicitud quedó registrada y está lista para seguimiento." steps={steps} currentStep={7} backLabel="Elegir otra opción" onBack={onBack}>
+        <div className="mx-auto max-w-xl text-center">
+          <Card>
+            <CardContent className="pt-10 text-center space-y-6">
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400">
               <Check className="h-8 w-8" />
             </div>
@@ -225,77 +222,17 @@ export default function PublicOrderWizard() {
                 Solicitar otro estudio
               </Button>
             </div>
-          </CardContent>
-        </Card>
-      </div>
+            </CardContent>
+          </Card>
+        </div>
+      </AppointmentWizardFrame>
     )
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50/50 dark:bg-zinc-950 flex flex-col items-center py-10 px-4">
-      <div className="w-full max-w-4xl space-y-8">
-        {/* Title */}
-        <div className="text-center space-y-2">
-          <h1 className="text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
-            Solicitud de Estudios Clínicos
-          </h1>
-          <p className="text-zinc-500 dark:text-zinc-400 max-w-md mx-auto">
-            Completa el formulario para enviar la solicitud de estudio radiológico.
-          </p>
-        </div>
-
-        {/* Stepper Header */}
-        <div className="hidden md:flex justify-between items-center bg-white dark:bg-zinc-900 p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
-          {stepsList.map((s, idx) => {
-            const Icon = s.icon
-            const isActive = step === s.num
-            const isCompleted = step > s.num
-            return (
-              <div key={s.num} className="flex items-center flex-1 last:flex-initial">
-                <div className="flex items-center gap-2">
-                  <div
-                    className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold transition-all ${
-                      isActive
-                        ? 'bg-primary text-white scale-110 shadow-sm'
-                        : isCompleted
-                        ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400'
-                        : 'bg-zinc-100 text-zinc-400 dark:bg-zinc-800'
-                    }`}
-                  >
-                    {isCompleted ? <Check className="h-4 w-4" /> : s.num}
-                  </div>
-                  <span
-                    className={`text-xs font-medium ${
-                      isActive ? 'text-zinc-900 dark:text-zinc-50 font-bold' : 'text-zinc-400 dark:text-zinc-500'
-                    }`}
-                  >
-                    {s.label}
-                  </span>
-                </div>
-                {idx < stepsList.length - 1 && (
-                  <div
-                    className={`h-[2px] flex-1 mx-4 transition-all ${
-                      step > s.num ? 'bg-emerald-200 dark:bg-emerald-900' : 'bg-zinc-100 dark:bg-zinc-800'
-                    }`}
-                  />
-                )}
-              </div>
-            )
-          })}
-        </div>
-
-        {/* Stepper Header Mobile */}
-        <div className="md:hidden flex items-center justify-between bg-white dark:bg-zinc-900 p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
-          <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">
-            Paso {step} de 6: {stepsList[step - 1]?.label}
-          </span>
-          <div className="h-2 w-24 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
-            <div className="h-full bg-primary" style={{ width: `${(step / 6) * 100}%` }} />
-          </div>
-        </div>
-
-        {/* Form Card */}
-        <Card className="border-zinc-200 shadow-lg dark:border-zinc-800">
+    <AppointmentWizardFrame title="Solicitud de estudios clínicos" subtitle="Completa el formulario para enviar la solicitud de estudio radiológico." steps={steps} currentStep={step} backLabel="Elegir otra opción" onBack={onBack}>
+      <div className="mx-auto">
+        <Card>
           {/* Step 1: Doctor Info */}
           {step === 1 && (
             <>
@@ -452,7 +389,7 @@ export default function PublicOrderWizard() {
                     <NativeSelect
                       id="patientSex"
                       value={patient.sex}
-                      onChange={(e) => setPatient({ ...patient, sex: e.target.value as any })}
+                      onChange={(e) => setPatient({ ...patient, sex: e.target.value as typeof patient.sex })}
                     >
                       <option value="unspecified">Sin especificar</option>
                       <option value="male">Masculino</option>
@@ -498,12 +435,13 @@ export default function PublicOrderWizard() {
                 ) : clinics.length === 0 ? (
                   <div className="py-8 text-center text-zinc-500 text-sm">No hay clínicas disponibles.</div>
                 ) : (
-                  <div className="space-y-3">
+                  <fieldset className="m-0 min-w-0 border-0 p-0 space-y-3" aria-describedby={errors.clinicId ? 'clinicId-error' : undefined}>
+                    <legend className="sr-only">Clínica donde se realizará el estudio</legend>
                     {clinics.map((c) => (
-                      <div
+                      <label
                         key={c.id}
-                        onClick={() => setClinicId(c.id)}
-                        className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                        htmlFor={`clinic-${c.id}`}
+                        className={`block p-4 rounded-xl border-2 cursor-pointer transition-all focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2 ${
                           clinicId === c.id
                             ? 'border-primary bg-primary/5'
                             : 'border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-900'
@@ -512,7 +450,10 @@ export default function PublicOrderWizard() {
                         <div className="flex justify-between items-center">
                           <span className="font-semibold text-zinc-900 dark:text-zinc-50">{c.name}</span>
                           <input
+                            id={`clinic-${c.id}`}
+                            name="clinicId"
                             type="radio"
+                            value={c.id}
                             checked={clinicId === c.id}
                             onChange={() => setClinicId(c.id)}
                             className="text-primary focus:ring-primary"
@@ -521,11 +462,11 @@ export default function PublicOrderWizard() {
                         {c.addressLine && (
                           <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">{c.addressLine}</p>
                         )}
-                      </div>
+                      </label>
                     ))}
-                  </div>
+                  </fieldset>
                 )}
-                {errors.clinicId && <p className="text-xs text-red-500">{errors.clinicId}</p>}
+                {errors.clinicId && <p id="clinicId-error" className="text-xs text-red-500">{errors.clinicId}</p>}
               </CardContent>
             </>
           )}
@@ -537,36 +478,57 @@ export default function PublicOrderWizard() {
                 <CardTitle className="text-xl font-semibold">Tipo de Estudio</CardTitle>
                 <CardDescription>Selecciona la modalidad de estudio clínico requerido.</CardDescription>
               </CardHeader>
-              <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div
-                  onClick={() => setStudyType('radiography')}
-                  className={`p-6 rounded-xl border-2 cursor-pointer transition-all text-center space-y-3 ${
-                    studyType === 'radiography'
-                      ? 'border-primary bg-primary/5'
-                      : 'border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-900'
-                  }`}
-                >
-                  <FileSpreadsheet className="h-10 w-10 mx-auto text-primary" />
-                  <div>
-                    <h3 className="font-bold text-lg text-zinc-900 dark:text-zinc-50">Radiografía</h3>
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">Estudios panorámicos, periapicales o cefalométricos.</p>
-                  </div>
-                </div>
+              <CardContent>
+                <fieldset className="m-0 min-w-0 border-0 p-0 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <legend className="sr-only">Tipo de estudio</legend>
+                  <label
+                    htmlFor="study-radiography"
+                    className={`p-6 rounded-xl border-2 cursor-pointer transition-all text-center space-y-3 focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2 ${
+                      studyType === 'radiography'
+                        ? 'border-primary bg-primary/5'
+                        : 'border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-900'
+                    }`}
+                  >
+                    <input
+                      id="study-radiography"
+                      name="studyType"
+                      type="radio"
+                      value="radiography"
+                      checked={studyType === 'radiography'}
+                      onChange={() => setStudyType('radiography')}
+                      className="sr-only"
+                    />
+                    <FileSpreadsheet className="h-10 w-10 mx-auto text-primary" />
+                    <div>
+                      <h3 className="font-bold text-lg text-zinc-900 dark:text-zinc-50">Radiografía</h3>
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">Estudios panorámicos, periapicales o cefalométricos.</p>
+                    </div>
+                  </label>
 
-                <div
-                  onClick={() => setStudyType('cbct')}
-                  className={`p-6 rounded-xl border-2 cursor-pointer transition-all text-center space-y-3 ${
-                    studyType === 'cbct'
-                      ? 'border-primary bg-primary/5'
-                      : 'border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-900'
-                  }`}
-                >
-                  <ClipboardList className="h-10 w-10 mx-auto text-primary" />
-                  <div>
-                    <h3 className="font-bold text-lg text-zinc-900 dark:text-zinc-50">Tomografía CBCT</h3>
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">Tomografía computarizada de haz cónico volumétrica.</p>
-                  </div>
-                </div>
+                  <label
+                    htmlFor="study-cbct"
+                    className={`p-6 rounded-xl border-2 cursor-pointer transition-all text-center space-y-3 focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2 ${
+                      studyType === 'cbct'
+                        ? 'border-primary bg-primary/5'
+                        : 'border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-900'
+                    }`}
+                  >
+                    <input
+                      id="study-cbct"
+                      name="studyType"
+                      type="radio"
+                      value="cbct"
+                      checked={studyType === 'cbct'}
+                      onChange={() => setStudyType('cbct')}
+                      className="sr-only"
+                    />
+                    <ClipboardList className="h-10 w-10 mx-auto text-primary" />
+                    <div>
+                      <h3 className="font-bold text-lg text-zinc-900 dark:text-zinc-50">Tomografía CBCT</h3>
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">Tomografía computarizada de haz cónico volumétrica.</p>
+                    </div>
+                  </label>
+                </fieldset>
               </CardContent>
             </>
           )}
@@ -746,7 +708,7 @@ export default function PublicOrderWizard() {
           )}
 
           {/* Footer Controls */}
-          <div className="p-6 bg-zinc-50/50 dark:bg-zinc-900/50 border-t border-zinc-200 dark:border-zinc-800 flex justify-between gap-4">
+          <div className="mt-6 flex justify-between gap-4 border-t border-pink-100 bg-pink-50/40 px-6 py-5 sm:px-8">
             {step > 1 ? (
               <Button onClick={handleBack} variant="outline" disabled={isSubmitting}>
                 Atrás
@@ -767,6 +729,6 @@ export default function PublicOrderWizard() {
           </div>
         </Card>
       </div>
-    </div>
+    </AppointmentWizardFrame>
   )
 }

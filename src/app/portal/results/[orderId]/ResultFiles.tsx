@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 
 import { Button } from '#/shared/components/ui/button'
 
@@ -8,6 +9,7 @@ type Asset = { id: string; name: string; type: string }
 
 export function ResultFiles({ orderId, assets }: { orderId: string; assets: Asset[] }) {
   const [loadingId, setLoadingId] = useState<string | null>(null)
+  const router = useRouter()
 
   async function openAsset(assetId: string) {
     setLoadingId(assetId)
@@ -23,7 +25,7 @@ export function ResultFiles({ orderId, assets }: { orderId: string; assets: Asse
 
   return (
     <>
-      {assets.some((asset) => asset.type === 'dicom' || asset.type === 'image') && <Button size="sm" onClick={() => window.location.assign(`/portal/results/${orderId}/viewer`)}>Abrir visor</Button>}
+      {assets.some((asset) => asset.type === 'dicom' || asset.type === 'image') && <Button size="sm" onClick={() => router.push(`/portal/results/${orderId}/viewer`)}>Abrir visor</Button>}
       <ul className="mt-3 space-y-2">
       {assets.map((asset) => (
         <li key={asset.id} className="flex items-center justify-between rounded border p-3">

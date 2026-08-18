@@ -1,6 +1,8 @@
-import { integer, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core'
+import { boolean, integer, jsonb, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core'
 
 import { organization } from '#/infrastructure/auth/db/schema'
+
+export type ClinicPublicHours = { dayOfWeek: number; startTime: string; endTime: string }[]
 
 export const clinicStatusEnum = pgEnum('clinic_status', ['active', 'inactive'])
 
@@ -27,6 +29,10 @@ export const clinic = pgTable('clinic', {
   timezone: text('timezone').notNull().default('America/Mexico_City'),
 
   slotIntervalMinutes: integer('slot_interval_minutes').notNull().default(15),
+
+  publicHours: jsonb('public_hours').$type<ClinicPublicHours>().notNull().default([]),
+
+  laboratoryEnabled: boolean('laboratory_enabled').notNull().default(false),
 
   status: clinicStatusEnum('status').notNull().default('active'),
 

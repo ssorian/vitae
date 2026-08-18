@@ -1,7 +1,7 @@
 'use server'
 
-import { publicAvailabilityInputSchema, publicBookingInputSchema } from '../schemas/appointment'
-import { createPublicAppointment, getPublicAvailableSlots, listPublicClinics } from '../services/appointment'
+import { publicAvailabilityInputSchema, publicBookingInputSchema, publicStudyBookingInputSchema } from '../schemas/appointment'
+import { createPublicAppointment, createPublicStudyOrder, getPublicAvailableSlots, listPublicClinics } from '../services/appointment'
 
 export async function listPublicBookingClinicsAction() {
   return listPublicClinics()
@@ -21,4 +21,10 @@ export async function createPublicAppointmentAction(input: unknown) {
   const parsed = publicBookingInputSchema.safeParse(input)
   if (!parsed.success) return { success: false as const, error: 'BOOKING_UNAVAILABLE' as const }
   return createPublicAppointment(parsed.data)
+}
+
+export async function createPublicStudyOrderAction(input: unknown) {
+  const parsed = publicStudyBookingInputSchema.safeParse(input)
+  if (!parsed.success) return { success: false as const, error: 'BOOKING_UNAVAILABLE' as const }
+  return createPublicStudyOrder(parsed.data)
 }

@@ -5,6 +5,8 @@ import {
   invitation,
   member,
   organization,
+  patientAccount,
+  patientPortalInvitation,
   session,
   user,
   verification,
@@ -16,6 +18,7 @@ import {
   orderAsset,
   orderEvent,
   orderResult,
+  orderResultGrant,
 } from '#/modules/order/db/schema'
 import {
   patient,
@@ -33,9 +36,12 @@ export const relations = defineRelations(
     orderAsset,
     orderEvent,
     orderResult,
+    orderResultGrant,
     organization,
     patient,
+    patientAccount,
     patientHistory,
+    patientPortalInvitation,
     session,
     user,
     verification,
@@ -77,6 +83,10 @@ export const relations = defineRelations(
         from: t.order.id,
         to: t.orderEvent.orderId,
       }),
+      resultGrants: t.many.orderResultGrant({
+        from: t.order.id,
+        to: t.orderResultGrant.orderId,
+      }),
     },
     orderResult: {
       order: t.one.order({
@@ -94,6 +104,16 @@ export const relations = defineRelations(
         to: t.order.id,
       }),
     },
+    orderResultGrant: {
+      order: t.one.order({
+        from: t.orderResultGrant.orderId,
+        to: t.order.id,
+      }),
+      createdBy: t.one.user({
+        from: t.orderResultGrant.createdByUserId,
+        to: t.user.id,
+      }),
+    },
     orderEvent: {
       order: t.one.order({
         from: t.orderEvent.orderId,
@@ -105,9 +125,40 @@ export const relations = defineRelations(
       }),
     },
     patient: {
+      account: t.one.patientAccount({
+        from: t.patient.id,
+        to: t.patientAccount.patientId,
+      }),
       history: t.one.patientHistory({
         from: t.patient.id,
         to: t.patientHistory.patientId,
+      }),
+      portalInvitations: t.many.patientPortalInvitation({
+        from: t.patient.id,
+        to: t.patientPortalInvitation.patientId,
+      }),
+    },
+    patientAccount: {
+      patient: t.one.patient({
+        from: t.patientAccount.patientId,
+        to: t.patient.id,
+        optional: false,
+      }),
+      user: t.one.user({
+        from: t.patientAccount.userId,
+        to: t.user.id,
+        optional: false,
+      }),
+    },
+    patientPortalInvitation: {
+      patient: t.one.patient({
+        from: t.patientPortalInvitation.patientId,
+        to: t.patient.id,
+        optional: false,
+      }),
+      createdBy: t.one.user({
+        from: t.patientPortalInvitation.createdByUserId,
+        to: t.user.id,
       }),
     },
     patientHistory: {
@@ -118,6 +169,20 @@ export const relations = defineRelations(
       orders: t.many.order({
         from: t.patientHistory.id,
         to: t.order.patientHistoryId,
+      }),
+    },
+    user: {
+      patientAccount: t.one.patientAccount({
+        from: t.user.id,
+        to: t.patientAccount.userId,
+      }),
+      patientPortalInvitationsCreated: t.many.patientPortalInvitation({
+        from: t.user.id,
+        to: t.patientPortalInvitation.createdByUserId,
+      }),
+      resultGrantsCreated: t.many.orderResultGrant({
+        from: t.user.id,
+        to: t.orderResultGrant.createdByUserId,
       }),
     },
   }),

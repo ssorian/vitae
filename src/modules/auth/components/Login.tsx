@@ -55,6 +55,26 @@ export function LoginForm({
     }
   }
 
+  async function handleGoogleSignIn() {
+    setError(null)
+    setIsPending(true)
+
+    try {
+      const result = await authClient.signIn.social({
+        provider: 'google',
+        callbackURL: redirectTo,
+      })
+
+      if (result.error) {
+        setError('Unable to sign in with Google. Please try again.')
+      }
+    } catch {
+      setError('Unable to sign in with Google. Please try again.')
+    } finally {
+      setIsPending(false)
+    }
+  }
+
   return (
     <Card>
       <CardContent>
@@ -108,6 +128,15 @@ export function LoginForm({
               disabled={isPending}
             >
               {isPending ? 'Signing in…' : 'Sign in'}
+            </Button>
+
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isPending}
+              onClick={handleGoogleSignIn}
+            >
+              Continue with Google
             </Button>
 
             <FieldDescription>

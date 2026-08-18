@@ -19,6 +19,8 @@
   --brand-pink-deep: #a90068;
   --brand-pink-soft: #f2a0cc;
   --brand-pink-pale: #fce8f3;
+  --clinical-gray: #f1f3f2;
+  --clinical-gray-line: #dce1df;
 
   --neutral-950: #29252a;
   --neutral-800: #403b41;
@@ -625,6 +627,51 @@ a {
     var(--header-bg) 84%,
     transparent 16%
   );
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .appointment-wizard-step {
+    animation: appointment-wizard-step-in 180ms ease-out both;
+  }
+}
+
+@keyframes appointment-wizard-step-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .appointment-wizard *,
+  .appointment-wizard *::before,
+  .appointment-wizard *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+.appointment-wizard [data-slot='input'],
+.appointment-wizard [data-slot='native-select'],
+.appointment-wizard [data-slot='button'] {
+  min-height: 2.5rem;
+}
+
+.appointment-wizard [data-slot='native-select-wrapper'] {
+  width: 100%;
+}
+
+.appointment-wizard [data-slot='textarea'] {
+  min-height: 5rem;
+}
+
+.appointment-wizard label:has(input[type='radio']):active {
+  transform: translateY(1px);
 }
 
 @layer base {

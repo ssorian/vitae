@@ -2,19 +2,25 @@
 
 import { revalidatePath } from 'next/cache'
 import { requireOrganization } from '#/infrastructure/auth/requireOrganization'
-import { appointmentInputSchema, appointmentStatusInputSchema, availabilityInputSchema, resourceAvailabilityInputSchema, resourceBlockInputSchema, resourceInputSchema, rescheduleInputSchema, scheduleOrderInputSchema } from '../schemas/appointment'
-import { appointmentAccess, createClinicalAppointment, createResource, createResourceBlock, getAvailableSlots, listAgenda, listPatients, listResources, replaceResourceAvailability, rescheduleAppointment, scheduleOrderAppointment, transitionAppointment, updateResource } from '../services/appointment'
+import { requireClinicAccess } from '#/infrastructure/auth/requireClinicAccess'
+import { appointmentInputSchema, appointmentStatusInputSchema, availabilityInputSchema, rescheduleInputSchema, scheduleOrderInputSchema } from '../schemas/appointment'
+import { appointmentAccess, createClinicalAppointment, getAppointmentClinicId, getAvailableSlots, getOrderClinicId, listAgenda, listPatients, rescheduleAppointment, scheduleOrderAppointment, transitionAppointment } from '../services/appointment'
 
-async function manager() { const context = await requireOrganization(); const access = await appointmentAccess(context.organizationId, context.user.id); if (!['owner', 'assistant'].includes(access.role)) throw new Error('FORBIDDEN'); return { ...context, access } }
-export async function listPatientsAction() { const { organizationId } = await manager(); return listPatients(organizationId) }
-export async function listResourcesAction(clinicId: string, activeOnly = false) { const { organizationId } = await manager(); return listResources(organizationId, clinicId, activeOnly) }
-export async function createResourceAction(input: unknown) { const data = resourceInputSchema.parse(input); const { organizationId } = await manager(); const result = await createResource(organizationId, data); revalidatePath('/org/appointments'); return result }
-export async function updateResourceAction(id: string, input: unknown) { const data = resourceInputSchema.parse(input); const { organizationId } = await manager(); const result = await updateResource(organizationId, id, data); revalidatePath('/org/appointments'); return result }
-export async function setResourceAvailabilityAction(resourceId: string, input: unknown) { const data = resourceAvailabilityInputSchema.array().parse(input); const { organizationId } = await manager(); await replaceResourceAvailability(organizationId, resourceId, data); revalidatePath('/org/appointments') }
-export async function createResourceBlockAction(input: unknown) { const data = resourceBlockInputSchema.parse(input); const { organizationId } = await manager(); const result = await createResourceBlock(organizationId, data); revalidatePath('/org/appointments'); return result }
-export async function getAvailableSlotsAction(input: unknown) { const data = availabilityInputSchema.parse(input); const { organizationId } = await manager(); return getAvailableSlots(data, organizationId) }
-export async function createAppointmentAction(input: unknown) { const data = appointmentInputSchema.parse(input); const { organizationId, user } = await manager(); const result = await createClinicalAppointment(organizationId, user.id, data); revalidatePath('/org/appointments'); return result }
-export async function rescheduleAppointmentAction(input: unknown) { const data = rescheduleInputSchema.parse(input); const { organizationId, user } = await manager(); const { id, ...slot } = data; const result = await rescheduleAppointment(organizationId, user.id, id, slot); revalidatePath('/org/appointments'); return result }
-export async function transitionAppointmentAction(input: unknown) { const data = appointmentStatusInputSchema.parse(input); const context = await requireOrganization(); const access = await appointmentAccess(context.organizationId, context.user.id); const result = await transitionAppointment(context.organizationId, context.user.id, access.id, access.role, data.id, data.status); revalidatePath('/org/appointments'); revalidatePath('/org/orders'); return result }
-export async function listAgendaAction(clinicId?: string, date?: string) { const context = await requireOrganization(); return listAgenda(context.organizationId, context.user.id, clinicId, date) }
-export async function scheduleOrderAppointmentAction(input: unknown) { const data = scheduleOrderInputSchema.parse(input); const { organizationId, user } = await manager(); const result = await scheduleOrderAppointment(organizationId, user.id, data); revalidatePath('/org/appointments'); revalidatePath(`/org/orders/${data.orderId}`); return result }
+async function manager(clinicId?: string) {
+  const context = await requireOrganization()
+  const access = await appointmentAccess(context.organizationId, context.user.id)
+  if (!access.active || !['owner', 'assistant'].includes(access.role)) throw new Error('FORBIDDEN')
+  if (clinicId) await requireClinicAccess(clinicId)
+  else if (access.role === 'assistant') throw new Error('FORBIDDEN')
+  return { ...context, access }
+}
+
+function revalidateClinic(clinicId: string) { revalidatePath(`/clinics/${clinicId}`) }
+
+export async function listPatientsAction(clinicId?: string) { const { organizationId } = await manager(clinicId); return listPatients(organizationId) }
+export async function getAvailableSlotsAction(input: unknown) { const data = availabilityInputSchema.parse(input); const { organizationId } = await manager(data.clinicId); return getAvailableSlots(data, organizationId) }
+export async function createAppointmentAction(input: unknown) { const data = appointmentInputSchema.parse(input); const { organizationId, user } = await manager(data.clinicId); const result = await createClinicalAppointment(organizationId, user.id, data); revalidateClinic(data.clinicId); return result }
+export async function rescheduleAppointmentAction(input: unknown) { const data = rescheduleInputSchema.parse(input); const currentClinicId = await getAppointmentClinicId(data.id); await manager(currentClinicId); const { organizationId, user } = await manager(data.clinicId); const { id, ...slot } = data; const result = await rescheduleAppointment(organizationId, user.id, id, slot); revalidateClinic(data.clinicId); return result }
+export async function transitionAppointmentAction(input: unknown) { const data = appointmentStatusInputSchema.parse(input); const clinicId = await getAppointmentClinicId(data.id); const context = await manager(clinicId); const result = await transitionAppointment(context.organizationId, context.user.id, context.access.role, data.id, data.status); revalidateClinic(clinicId); return result }
+export async function listAgendaAction(clinicId?: string, date?: string) { const context = await manager(clinicId); return listAgenda(context.organizationId, clinicId, date) }
+export async function scheduleOrderAppointmentAction(input: unknown) { const data = scheduleOrderInputSchema.parse(input); const clinicId = await getOrderClinicId(data.orderId); const { organizationId, user } = await manager(clinicId); const result = await scheduleOrderAppointment(organizationId, user.id, data); revalidateClinic(clinicId); return result }
