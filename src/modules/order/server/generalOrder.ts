@@ -9,6 +9,7 @@ import { listClinics } from '#/modules/clinic/services/clinic'
 import { requireOrganization } from '#/infrastructure/auth/requireOrganization'
 import { appointmentAccess } from '#/modules/appointment/services/appointment'
 import { requireClinicAccess } from '#/infrastructure/auth/requireClinicAccess'
+import { professionalOrderAccessState } from '#/modules/order/professionalOrder'
 
 async function operationalAccess(clinicId?: string) {
   const context = await requireOrganization()
@@ -26,12 +27,6 @@ async function operationalAccess(clinicId?: string) {
     return { ...context, access, clinicId: access.assignedClinicId }
   }
   return { ...context, access, clinicId: undefined }
-}
-
-export function professionalOrderAccessState(error: unknown) {
-  return error instanceof Error && error.message === 'UNAUTHORIZED'
-    ? { authenticated: false as const, active: false as const }
-    : { authenticated: true as const, active: false as const }
 }
 
 export async function getProfessionalOrderAccessAction() {

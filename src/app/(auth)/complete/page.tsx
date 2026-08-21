@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { Suspense, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 
 import { associateCurrentGoogleUserWithDoctorClientAction } from '#/modules/client/server/association'
@@ -10,7 +10,7 @@ function localRedirect(redirect: string | null) {
   return redirect && redirect.startsWith('/') && !redirect.startsWith('//') && !redirect.includes('\\') ? redirect : '/appointments'
 }
 
-export default function AuthCompletePage() {
+function AuthComplete() {
   const router = useRouter()
   const searchParams = useSearchParams()
   useEffect(() => {
@@ -23,5 +23,9 @@ export default function AuthCompletePage() {
     })
   }, [router, searchParams])
 
-  return <main className="flex min-h-svh items-center justify-center p-6"><p role="status">Estamos preparando tu cuenta…</p></main>
+  return <p role="status">Estamos preparando tu cuenta…</p>
+}
+
+export default function AuthCompletePage() {
+  return <main className="flex min-h-svh items-center justify-center p-6"><Suspense fallback={<p role="status">Estamos preparando tu cuenta…</p>}><AuthComplete /></Suspense></main>
 }
