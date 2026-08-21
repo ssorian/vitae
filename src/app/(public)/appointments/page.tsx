@@ -4,6 +4,7 @@ import { Suspense, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { CalendarDays, ClipboardList } from 'lucide-react'
 
+import { getAuthenticatedPatientBookingAction } from '#/modules/appointment/server/publicAppointment'
 import PatientAppointmentWizard from './PatientAppointmentWizard'
 import ProfessionalOrderWizard from './ProfessionalOrderWizard'
 
@@ -30,6 +31,13 @@ export default function AppointmentsPage() {
 function AppointmentsPageContent() {
   const searchParams = useSearchParams()
   const [appointmentType, setAppointmentType] = useState<AppointmentType>(() => searchParams.get('tipo') === 'doctor' ? 'doctor' : null)
+  const [existingPatient, setExistingPatient] = useState<boolean | null>(null)
+  const [authenticatedPatient, setAuthenticatedPatient] = useState(false)
+  const choosePatient = async () => {
+    const account = await getAuthenticatedPatientBookingAction().catch(() => null)
+    setAuthenticatedPatient(!!account)
+    setAppointmentType('patient')
+  }
 
   const choice = (
     <section aria-labelledby="appointment-choice-title" className="appointment-wizard-step border-b border-pink-100 bg-pink-50 py-20 sm:py-28">
@@ -40,7 +48,7 @@ function AppointmentsPageContent() {
           <p className="mt-6 max-w-xl text-lg leading-8 text-zinc-600">Elige la opción que corresponde a tu atención.</p>
         </div>
         <div className="mt-14 grid gap-6 md:grid-cols-2">
-          <button type="button" onClick={() => setAppointmentType('patient')} className="group rounded-2xl border border-pink-200 bg-white p-6 text-left shadow-[0_16px_40px_rgba(190,24,93,.08)] transition-[transform,border-color,box-shadow] duration-200 hover:-translate-y-1 hover:border-pink-400 hover:shadow-[0_20px_48px_rgba(190,24,93,.14)] active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-600 focus-visible:ring-offset-4 sm:p-8">
+          <button type="button" onClick={() => void choosePatient()} className="group rounded-2xl border border-pink-200 bg-white p-6 text-left shadow-[0_16px_40px_rgba(190,24,93,.08)] transition-[transform,border-color,box-shadow] duration-200 hover:-translate-y-1 hover:border-pink-400 hover:shadow-[0_20px_48px_rgba(190,24,93,.14)] active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-600 focus-visible:ring-offset-4 sm:p-8">
             <span className="flex size-12 items-center justify-center rounded-full bg-pink-100 text-pink-700 transition-colors group-hover:bg-pink-600 group-hover:text-white"><CalendarDays aria-hidden="true" className="size-6" strokeWidth={1.6} /></span>
             <h2 className="mt-8 text-2xl font-semibold tracking-[-0.03em]">Soy paciente</h2>
             <p className="mt-3 max-w-md leading-7 text-zinc-600">Agenda una cita o un estudio y consulta los horarios disponibles en tu clínica.</p>
@@ -55,6 +63,29 @@ function AppointmentsPageContent() {
     </section>
   )
 
+  const patientChoice = (
+    <section aria-labelledby="patient-choice-title" className="appointment-wizard-step border-b border-pink-100 bg-pink-50 py-20 sm:py-28">
+      <div className="mx-auto max-w-7xl px-6 lg:px-8">
+        <div className="max-w-2xl">
+          <p className="text-sm font-semibold text-pink-700">Agenda con Vitae</p>
+          <h1 id="patient-choice-title" className="mt-4 text-balance text-5xl font-semibold tracking-[-0.055em] sm:text-6xl">Cuéntanos sobre ti</h1>
+          <p className="mt-6 max-w-xl text-lg leading-8 text-zinc-600">Elige la opción que corresponde a tu atención.</p>
+        </div>
+        <div className="mt-14 grid gap-6 md:grid-cols-2">
+          <button type="button" onClick={() => setExistingPatient(true)} className="group rounded-2xl border border-pink-200 bg-white p-6 text-left shadow-[0_16px_40px_rgba(190,24,93,.08)] transition-[transform,border-color,box-shadow] duration-200 hover:-translate-y-1 hover:border-pink-400 hover:shadow-[0_20px_48px_rgba(190,24,93,.14)] active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-600 focus-visible:ring-offset-4 sm:p-8">
+            <span className="flex size-12 items-center justify-center rounded-full bg-pink-100 text-pink-700 transition-colors group-hover:bg-pink-600 group-hover:text-white"><CalendarDays aria-hidden="true" className="size-6" strokeWidth={1.6} /></span>
+            <h2 className="mt-8 text-2xl font-semibold tracking-[-0.03em]">Ya soy paciente</h2>
+            <p className="mt-3 max-w-md leading-7 text-zinc-600">Ingresa tus datos de contacto para localizar tu expediente.</p>
+          </button>
+          <button type="button" onClick={() => setExistingPatient(false)} className="group rounded-2xl border border-pink-200 bg-pink-600 p-6 text-left text-white shadow-[0_16px_40px_rgba(190,24,93,.2)] transition-[transform,box-shadow] duration-200 hover:-translate-y-1 hover:shadow-[0_20px_48px_rgba(190,24,93,.3)] active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-600 focus-visible:ring-offset-4 sm:p-8">
+            <span className="flex size-12 items-center justify-center rounded-full bg-white/15 text-white transition-colors group-hover:bg-white group-hover:text-pink-700"><ClipboardList aria-hidden="true" className="size-6" strokeWidth={1.6} /></span>
+            <h2 className="mt-8 text-2xl font-semibold tracking-[-0.03em]">Soy paciente nuevo</h2>
+            <p className="mt-3 max-w-md leading-7 text-pink-50">Crea tu solicitud con tus datos y agenda el horario que prefieras.</p>
+          </button>
+        </div>
+      </div>
+    </section>
+  )
 
-  return <main className="appointment-wizard min-h-[calc(100dvh-4rem)] bg-white text-zinc-900">{appointmentType === 'patient' ? <PatientAppointmentWizard onBack={() => setAppointmentType(null)} /> : appointmentType === 'doctor' ? <ProfessionalOrderWizard onBack={() => setAppointmentType(null)} /> : choice}<ContactGuidance /></main>
+  return <main className="appointment-wizard min-h-[calc(100dvh-4rem)] bg-white text-zinc-900">{appointmentType === 'patient' ? authenticatedPatient ? <PatientAppointmentWizard existing={false} authenticated onBack={() => setAppointmentType(null)} /> : existingPatient === null ? patientChoice : <PatientAppointmentWizard existing={existingPatient} authenticated={false} onBack={() => setExistingPatient(null)} /> : appointmentType === 'doctor' ? <ProfessionalOrderWizard onBack={() => setAppointmentType(null)} /> : choice}<ContactGuidance /></main>
 }

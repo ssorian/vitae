@@ -7,7 +7,7 @@ import { patientAccount } from '#/infrastructure/auth/db/schema'
 import { db } from '#/infrastructure/database'
 import { patient } from '#/modules/patient/db/schema'
 
-import { publicAvailabilityInputSchema, publicBookingInputSchema, publicExistingBookingInputSchema, publicExistingStudyBookingInputSchema, publicStudyBookingInputSchema } from '../schemas/appointment'
+import { publicAvailabilityInputSchema, publicBookingInputSchema, publicExistingBookingInputSchema, publicExistingStudyBookingInputSchema, publicNewBookingInputSchema, publicNewStudyBookingInputSchema, publicStudyBookingInputSchema } from '../schemas/appointment'
 import type { orderStudyTypes } from '#/modules/order/schemas/studyCatalog'
 import { createPublicAppointment, createPublicStudyOrder, getPublicAvailableSlots, listPublicClinics } from '../services/appointment'
 
@@ -20,13 +20,13 @@ export async function getPublicAvailabilityAction(input: unknown) {
 }
 
 export async function createPublicAppointmentAction(input: unknown) {
-  const parsed = publicBookingInputSchema.safeParse(input)
+  const parsed = publicNewBookingInputSchema.safeParse(input)
   if (!parsed.success) return { success: false as const, error: 'BOOKING_UNAVAILABLE' as const }
   return createPublicAppointment(parsed.data)
 }
 
 export async function createPublicStudyOrderAction(input: unknown) {
-  const parsed = publicStudyBookingInputSchema.safeParse(input)
+  const parsed = publicNewStudyBookingInputSchema.safeParse(input)
   if (!parsed.success) return { success: false as const, error: 'BOOKING_UNAVAILABLE' as const }
   return createPublicStudyOrder(parsed.data)
 }
@@ -43,14 +43,14 @@ export async function createExistingPublicStudyOrderAction(input: unknown) {
   return createExistingPublicStudyOrder(parsed.data)
 }
 
-type AuthenticatedPatientBookingIdentity = { patientId: string; firstName: string; paternalLastName: string | null; maternalLastName: string | null; phone: string | null; email: string | null }
+type AuthenticatedPatientBookingIdentity = { patientId: string; firstName: string; paternalLastName?: string; maternalLastName?: string; phone?: string; email?: string }
 
 async function currentPatientBookingIdentity(): Promise<AuthenticatedPatientBookingIdentity | null> {
   const { headers } = await import('next/headers')
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) return null
   const [identity] = await db.select({ patientId: patientAccount.patientId, firstName: patient.firstName, paternalLastName: patient.paternalLastName, maternalLastName: patient.maternalLastName, phone: patient.phone, email: patient.email }).from(patientAccount).innerJoin(patient, eq(patientAccount.patientId, patient.id)).where(and(eq(patientAccount.userId, session.user.id), isNotNull(patientAccount.verifiedAt), isNull(patientAccount.revokedAt)))
-  return identity ?? null
+  return identity && { ...identity, paternalLastName: identity.paternalLastName ?? undefined, maternalLastName: identity.maternalLastName ?? undefined, phone: identity.phone ?? undefined, email: identity.email ?? undefined }
 }
 
 export async function getAuthenticatedPatientBookingAction() { return currentPatientBookingIdentity() }

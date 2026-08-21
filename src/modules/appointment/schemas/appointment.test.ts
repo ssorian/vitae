@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { appointmentInputSchema, normalizePatientContact, publicStudyBookingInputSchema } from './appointment'
+import { appointmentInputSchema, normalizePatientContact, publicNewBookingInputSchema, publicStudyBookingInputSchema } from './appointment'
 
 const slot = { clinicId: '00000000-0000-4000-8000-000000000001', startsAt: '2026-01-01T10:00:00.000Z', endsAt: '2026-01-01T10:30:00.000Z' }
 
@@ -12,6 +12,15 @@ test('internal new-patient appointments require identity and contact details', (
 
 test('internal duplicate matching normalizes contacts', () => {
   assert.deepEqual(normalizePatientContact({ email: ' ANA@EXAMPLE.COM ', phone: '+52 (55) 1234-5678' }), { email: 'ana@example.com', phone: '525512345678' })
+})
+
+test('new public bookings require both surnames and retain the maternal surname', () => {
+  const request = { clinicPublicSlug: 'clinica', startsAt: '2026-01-01T10:00:00.000Z', firstName: 'Ana', paternalLastName: 'López', maternalLastName: 'García', phone: '5512345678' }
+  const parsed = publicNewBookingInputSchema.safeParse(request)
+  assert.equal(parsed.success, true)
+  if (parsed.success) assert.equal(parsed.data.maternalLastName, 'García')
+  assert.equal(publicNewBookingInputSchema.safeParse({ ...request, maternalLastName: '' }).success, false)
+  assert.equal(publicNewBookingInputSchema.safeParse({ ...request, paternalLastName: undefined }).success, false)
 })
 
 test('public study requests reject endodontic evaluations', () => {
