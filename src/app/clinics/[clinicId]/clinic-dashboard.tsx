@@ -18,6 +18,7 @@ export function ClinicDashboard({
     { title: 'Inicio', icon: Home, to: basePath },
     { title: 'Agenda', icon: CalendarDays, to: `${basePath}/agenda` },
     { title: 'Pacientes e historial', icon: Users, to: `${basePath}/patients` },
+    { title: 'Doctores clientes', icon: Users, to: `${basePath}/doctors` },
     ...(clinic.laboratoryEnabled ? [{ title: 'Órdenes', icon: ClipboardList, to: `${basePath}/orders` }] : []),
     { title: 'Configuración', icon: Settings, to: `${basePath}/settings` },
     ...(isOwner ? [{ title: 'Volver a clínicas', icon: Building2, to: '/org/clinics' }] : []),
