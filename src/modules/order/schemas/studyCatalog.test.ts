@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { cbctDetailsSchema, endodonticEvaluationDetailsSchema, radiography2dDefaults, radiography2dDetailsSchema } from './studyCatalog'
+import { cbctDetailsSchema, endodonticEvaluationDetailsSchema, publicStudyTypes, radiography2dDefaults, radiography2dDetailsSchema } from './studyCatalog'
+
+test('public study catalog preserves order and excludes endodontic evaluations', () => {
+  assert.deepEqual(publicStudyTypes, ['radiography', 'radiography_2d', 'cbct', 'cephalometric_analysis', 'study_models', 'intraoral_scan', 'orthodontic_package', 'aligner_package', 'laboratory_order'])
+})
 
 test('radiography 2D variant defaults include its required conditional fields', () => {
   assert.deepEqual(radiography2dDefaults('half_panoramic'), { variant: 'half_panoramic', side: 'left' })

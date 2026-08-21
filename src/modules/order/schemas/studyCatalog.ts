@@ -17,6 +17,7 @@ export const orderStudyTypes = [
   'endodontic_evaluation',
 ] as const
 export const orderStudyTypeSchema = z.enum(orderStudyTypes)
+export const publicStudyTypes = orderStudyTypes.filter((type) => type !== 'endodontic_evaluation')
 
 // Legacy orders remain readable with their original payload shape.
 export const radiographyDetailsSchema = z.object({
