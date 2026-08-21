@@ -1,52 +1,14 @@
 import { z } from 'zod'
 
 export const doctorClientSchema = z.object({
-  firstName: z
-    .string()
-    .trim()
-    .min(1, 'El nombre es obligatorio')
-    .max(100),
-
-  paternalLastName: z
-    .string()
-    .trim()
-    .min(1, 'El apellido paterno es obligatorio')
-    .max(100),
-
-  maternalLastName: z
-    .string()
-    .trim()
-    .max(100)
-    .optional(),
-
-  professionalLicense: z
-    .string()
-    .trim()
-    .max(50)
-    .optional(),
-
-  specialty: z
-    .string()
-    .trim()
-    .max(150)
-    .optional(),
-
-  clinicName: z
-    .string()
-    .trim()
-    .max(200)
-    .optional(),
-
-  phone: z
-    .string()
-    .trim()
-    .max(20)
-    .optional(),
-
-  email: z
-    .string()
-    .trim()
-    .email('Correo electrónico inválido'),
+  firstName: z.string().trim().min(1, 'El nombre es obligatorio').max(100),
+  paternalLastName: z.string().trim().min(1, 'El apellido paterno es obligatorio').max(100),
+  maternalLastName: z.string().trim().max(100).optional(),
+  professionalLicense: z.string().trim().max(50).optional(),
+  specialty: z.string().trim().max(150).optional(),
+  clinicName: z.string().trim().max(200).optional(),
+  phone: z.string().trim().max(20).optional(),
+  email: z.string().trim().email('Correo electrónico inválido'),
 })
 
 export const patientSchema = z.object({
@@ -137,6 +99,23 @@ export const createOrderSchema = z.discriminatedUnion('type', [
   }),
 ])
 
+// The requesting professional is derived from the authenticated server session.
+// This browser payload intentionally has no doctor identity or profile fields.
+export const authenticatedProfessionalOrderSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal('radiography'),
+    patient: patientSchema,
+    clinicId: z.string().uuid('La clínica es obligatoria'),
+    details: radiographyDetailsSchema,
+  }).strict(),
+  z.object({
+    type: z.literal('cbct'),
+    patient: patientSchema,
+    clinicId: z.string().uuid('La clínica es obligatoria'),
+    details: cbctDetailsSchema,
+  }).strict(),
+])
+
 export type DoctorClientInput =
   z.infer<typeof doctorClientSchema>
 
@@ -153,4 +132,7 @@ export type CBCTDetailsInput =
   z.infer<typeof cbctDetailsSchema>
 
 export type CreateOrderInput =
-  z.infer<typeof createOrderSchema>
+  z.infer<typeof createOrderSchema>
+
+export type AuthenticatedProfessionalOrderInput =
+  z.infer<typeof authenticatedProfessionalOrderSchema>

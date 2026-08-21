@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 
 import { db } from '#/infrastructure/database'
 import {
@@ -14,8 +14,11 @@ import {
 } from '#/modules/order/db/schema'
 
 import { doctorClient } from '#/modules/client/db/schema'
+import { doctorClientSchema as sharedDoctorClientSchema } from '#/modules/client/schemas/client'
+import { resolveDoctorClient } from '#/modules/client/services/client'
 
 import type {
+  AuthenticatedProfessionalOrderInput,
   CreateOrderInput,
 } from '#/modules/order/schemas/generalOrder'
 
@@ -27,7 +30,9 @@ type CreateOrderParams = {
   organizationId: string
   userId?: string | null
   source: 'public' | 'internal'
-  data: CreateOrderInput
+  data: CreateOrderInput | AuthenticatedProfessionalOrderInput
+  // Only server code may provide this; browser payloads never contain a doctor id.
+  trustedDoctorClientId?: string
 }
 
 export async function createOrder({
@@ -35,6 +40,7 @@ export async function createOrder({
   userId,
   source,
   data,
+  trustedDoctorClientId,
 }: CreateOrderParams) {
   return db.transaction(async (tx) => {
     const clinicRecord = await tx.query.clinic.findFirst({
@@ -52,46 +58,26 @@ export async function createOrder({
     }
 
     /*
-     * 1. Find or create DoctorClient
+     * 1. Resolve the requesting professional.
+     * Self-service orders use a server-trusted active doctorClient id. Internal
+     * orders may supply doctor details, but shared resolution never overwrites
+     * an existing master profile.
      */
-    const existingDoctor = await tx.query.doctorClient.findFirst({
-      where: {
-        organizationId,
-        email: data.doctor.email.trim().toLowerCase(),
-      },
-    })
-
     let doctor
-
-    const doctorData = {
-      firstName: data.doctor.firstName.trim(),
-      paternalLastName: data.doctor.paternalLastName.trim(),
-      maternalLastName: data.doctor.maternalLastName?.trim() || null,
-      professionalLicense: data.doctor.professionalLicense?.trim() || null,
-      specialty: data.doctor.specialty?.trim() || null,
-      clinicName: data.doctor.clinicName?.trim() || null,
-      phone: data.doctor.phone?.trim() || null,
-      email: data.doctor.email.trim().toLowerCase(),
-      updatedAt: new Date(),
-    }
-
-    if (existingDoctor) {
-      const [updatedDoctor] = await tx
-        .update(doctorClient)
-        .set(doctorData)
-        .where(eq(doctorClient.id, existingDoctor.id))
-        .returning()
-      doctor = updatedDoctor
+    if (trustedDoctorClientId) {
+      const [trustedDoctor] = await tx.select().from(doctorClient).where(and(
+        eq(doctorClient.id, trustedDoctorClientId),
+        eq(doctorClient.organizationId, organizationId),
+        eq(doctorClient.status, 'active'),
+      )).limit(1)
+      if (!trustedDoctor) throw new Error('DOCTOR_CLIENT_NOT_FOUND')
+      doctor = trustedDoctor
     } else {
-      const [createdDoctor] = await tx
-        .insert(doctorClient)
-        .values({
-          ...doctorData,
-          organizationId,
-          userId: userId || null,
-        })
-        .returning()
-      doctor = createdDoctor
+      if (!('doctor' in data)) throw new Error('DOCTOR_CLIENT_REQUIRED')
+      doctor = (await resolveDoctorClient(tx, organizationId, {
+        ...sharedDoctorClientSchema.parse(data.doctor),
+        userId: null,
+      })).doctorClient
     }
 
     /*
@@ -281,7 +267,7 @@ export async function updateOrderStatus(
 
     // Determine event type
     let eventType: 'order.created' | 'order.scheduled' | 'order.started' | 'result.uploaded' | 'result.finalized' | 'email.sent' | 'order.delivered' | 'order.cancelled' | null = null
-    
+
     if (status === 'delivered') eventType = 'order.delivered'
     if (status === 'cancelled') eventType = 'order.cancelled'
 

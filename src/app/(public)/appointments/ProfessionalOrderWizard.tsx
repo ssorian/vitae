@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Check, ClipboardList, FileSpreadsheet } from 'lucide-react'
 
 import { Button } from '#/shared/components/ui/button'
@@ -13,7 +14,8 @@ import { Textarea } from '#/shared/components/ui/textarea'
 import AppointmentWizardFrame from './AppointmentWizardFrame'
 
 import {
-  createPublicOrderAction,
+  createProfessionalOrderAction,
+  getProfessionalOrderAccessAction,
   getPublicClinicsAction,
 } from '#/modules/order/server/generalOrder'
 
@@ -28,11 +30,13 @@ type ProfessionalOrderWizardProps = {
   onBack: () => void
 }
 
-const steps = ['Profesional', 'Paciente', 'Clínica', 'Estudio', 'Detalles', 'Revisión', 'Confirmación']
+const steps = ['Paciente', 'Clínica', 'Estudio', 'Detalles', 'Revisión', 'Confirmación']
 
 export default function ProfessionalOrderWizard({ onBack }: ProfessionalOrderWizardProps) {
-  // Steps: 1 (Doctor), 2 (Patient), 3 (Clinic), 4 (Study Type), 5 (Study Details), 6 (Review), 7 (Success)
+  const router = useRouter()
+  // The authenticated doctor is resolved server-side; the browser never supplies it.
   const [step, setStep] = useState(1)
+  const [access, setAccess] = useState<{ authenticated: boolean; active: boolean; doctor?: { firstName: string; paternalLastName: string; email: string } } | null>(null)
   const [clinics, setClinics] = useState<Clinic[]>([])
   const [isLoadingClinics, setIsLoadingClinics] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -40,17 +44,6 @@ export default function ProfessionalOrderWizard({ onBack }: ProfessionalOrderWiz
   const [successInfo, setSuccessInfo] = useState<{ folio: string; orderId: string } | null>(null)
 
   // Form State
-  const [doctor, setDoctor] = useState({
-    firstName: '',
-    paternalLastName: '',
-    maternalLastName: '',
-    email: '',
-    phone: '',
-    professionalLicense: '',
-    specialty: '',
-    clinicName: '',
-  })
-
   const [patient, setPatient] = useState({
     firstName: '',
     paternalLastName: '',
@@ -83,6 +76,11 @@ export default function ProfessionalOrderWizard({ onBack }: ProfessionalOrderWiz
   // Validation State for current step
   const [errors, setErrors] = useState<Record<string, string>>({})
 
+  // Resolve the active linked doctorClient on the server before enabling the form.
+  useEffect(() => {
+    getProfessionalOrderAccessAction().then(setAccess).catch(() => setAccess({ authenticated: false, active: false }))
+  }, [])
+
   // Load clinics on mount
   useEffect(() => {
     getPublicClinicsAction()
@@ -103,18 +101,10 @@ export default function ProfessionalOrderWizard({ onBack }: ProfessionalOrderWiz
     const stepErrors: Record<string, string> = {}
 
     if (currentStep === 1) {
-      if (!doctor.firstName.trim()) stepErrors.firstName = 'El nombre es obligatorio'
-      if (!doctor.paternalLastName.trim()) stepErrors.paternalLastName = 'El apellido paterno es obligatorio'
-      if (!doctor.email.trim()) {
-        stepErrors.email = 'El correo electrónico es obligatorio'
-      } else if (!/\S+@\S+\.\S+/.test(doctor.email)) {
-        stepErrors.email = 'Formato de correo electrónico inválido'
-      }
-    } else if (currentStep === 2) {
       if (!patient.firstName.trim()) stepErrors.patientFirstName = 'El nombre del paciente es obligatorio'
-    } else if (currentStep === 3) {
+    } else if (currentStep === 2) {
       if (!clinicId) stepErrors.clinicId = 'Debe seleccionar una clínica'
-    } else if (currentStep === 5) {
+    } else if (currentStep === 4) {
       if (studyType === 'radiography') {
         if (!radiographyDetails.radiographyType.trim()) {
           stepErrors.radiographyType = 'El tipo de radiografía es obligatorio'
@@ -153,26 +143,25 @@ export default function ProfessionalOrderWizard({ onBack }: ProfessionalOrderWiz
   }
 
   const handleSubmit = async () => {
-    if (!validateStep(5)) return
+    if (!validateStep(4)) return
     setIsSubmitting(true)
     setSubmitError(null)
 
     const payload = {
       type: studyType,
-      doctor,
       patient,
       clinicId,
       details: studyType === 'radiography' ? radiographyDetails : cbctDetails,
     }
 
     try {
-      const res = await createPublicOrderAction(payload)
+      const res = await createProfessionalOrderAction(payload)
       if (res.success) {
         setSuccessInfo({
           folio: res.data.folio,
           orderId: res.data.orderId,
         })
-        setStep(7)
+        setStep(6)
       } else {
         setSubmitError(res.error === 'INVALID_INPUT' ? 'Por favor revisa los datos ingresados.' : 'No se pudo crear la solicitud. Intenta más tarde.')
       }
@@ -184,9 +173,21 @@ export default function ProfessionalOrderWizard({ onBack }: ProfessionalOrderWiz
     }
   }
 
-  if (step === 7 && successInfo) {
+  if (access === null) {
+    return <div className="py-16 text-center text-zinc-600">Verificando acceso profesional...</div>
+  }
+
+  if (!access.authenticated) {
+    return <div className="mx-auto max-w-xl py-16"><Card><CardHeader><CardTitle>Inicia sesión para solicitar estudios</CardTitle><CardDescription>Tu cuenta profesional debe estar vinculada para solicitar estudios para tus pacientes.</CardDescription></CardHeader><CardContent><Button onClick={() => { router.push('/login?redirect=%2Fappointments%3Ftipo%3Ddoctor') }}>Continuar con Google o iniciar sesión</Button></CardContent></Card></div>
+  }
+
+  if (!access.active || !access.doctor) {
+    return <div className="mx-auto max-w-xl py-16"><Card><CardHeader><CardTitle>Se requiere un perfil profesional activo</CardTitle><CardDescription>Tu cuenta no tiene un perfil profesional vinculado. Completa el acceso con Google para crear o vincular tu perfil antes de solicitar estudios.</CardDescription></CardHeader><CardContent><Button onClick={() => { router.push('/login?redirect=%2Fappointments%3Ftipo%3Ddoctor') }}>Completar acceso profesional</Button></CardContent></Card></div>
+  }
+
+  if (step === 6 && successInfo) {
     return (
-      <AppointmentWizardFrame title="Solicitud de estudios clínicos" subtitle="Tu solicitud quedó registrada y está lista para seguimiento." steps={steps} currentStep={7} backLabel="Elegir otra opción" onBack={onBack}>
+      <AppointmentWizardFrame title="Solicitud de estudios clínicos" subtitle="Tu solicitud quedó registrada y está lista para seguimiento." steps={steps} currentStep={6} backLabel="Elegir otra opción" onBack={onBack}>
         <div className="mx-auto max-w-xl text-center">
           <Card>
             <CardContent className="pt-10 text-center space-y-6">
@@ -210,7 +211,7 @@ export default function ProfessionalOrderWizard({ onBack }: ProfessionalOrderWiz
 
             <div className="text-sm text-zinc-600 dark:text-zinc-300 space-y-2 max-w-md mx-auto">
               <p>
-                Hemos enviado un acuse de recibo a tu correo <strong>{doctor.email}</strong>.
+                Hemos enviado un acuse de recibo a tu correo <strong>{access.doctor.email}</strong>.
               </p>
               <p>
                 Cuando los resultados del estudio estén listos, recibirás un enlace de acceso seguro para descargarlos.
@@ -233,107 +234,8 @@ export default function ProfessionalOrderWizard({ onBack }: ProfessionalOrderWiz
     <AppointmentWizardFrame title="Solicitud de estudios clínicos" subtitle="Completa el formulario para enviar la solicitud de estudio radiológico." steps={steps} currentStep={step} backLabel="Elegir otra opción" onBack={onBack}>
       <div className="mx-auto">
         <Card>
-          {/* Step 1: Doctor Info */}
+          {/* Step 1: Patient Info */}
           {step === 1 && (
-            <>
-              <CardHeader>
-                <CardTitle className="text-xl font-semibold">Datos del Doctor Solicitante</CardTitle>
-                <CardDescription>Ingresa tus datos de contacto y profesionales.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="firstName">Nombre *</Label>
-                    <Input
-                      id="firstName"
-                      value={doctor.firstName}
-                      onChange={(e) => setDoctor({ ...doctor, firstName: e.target.value })}
-                      placeholder="Escribe tu nombre"
-                    />
-                    {errors.firstName && <p className="text-xs text-red-500">{errors.firstName}</p>}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="paternalLastName">Apellido Paterno *</Label>
-                    <Input
-                      id="paternalLastName"
-                      value={doctor.paternalLastName}
-                      onChange={(e) => setDoctor({ ...doctor, paternalLastName: e.target.value })}
-                      placeholder="Escribe tu apellido paterno"
-                    />
-                    {errors.paternalLastName && <p className="text-xs text-red-500">{errors.paternalLastName}</p>}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="maternalLastName">Apellido Materno</Label>
-                    <Input
-                      id="maternalLastName"
-                      value={doctor.maternalLastName}
-                      onChange={(e) => setDoctor({ ...doctor, maternalLastName: e.target.value })}
-                      placeholder="Escribe tu apellido materno"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Correo Electrónico *</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      value={doctor.email}
-                      onChange={(e) => setDoctor({ ...doctor, email: e.target.value })}
-                      placeholder="doctor@ejemplo.com"
-                    />
-                    {errors.email && <p className="text-xs text-red-500">{errors.email}</p>}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="phone">Teléfono</Label>
-                    <Input
-                      id="phone"
-                      value={doctor.phone}
-                      onChange={(e) => setDoctor({ ...doctor, phone: e.target.value })}
-                      placeholder="Número de contacto"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="professionalLicense">Cédula Profesional</Label>
-                    <Input
-                      id="professionalLicense"
-                      value={doctor.professionalLicense}
-                      onChange={(e) => setDoctor({ ...doctor, professionalLicense: e.target.value })}
-                      placeholder="Número de cédula"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="specialty">Especialidad</Label>
-                    <Input
-                      id="specialty"
-                      value={doctor.specialty}
-                      onChange={(e) => setDoctor({ ...doctor, specialty: e.target.value })}
-                      placeholder="Ej. Ortodoncia"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="clinicName">Clínica o Consultorio</Label>
-                    <Input
-                      id="clinicName"
-                      value={doctor.clinicName}
-                      onChange={(e) => setDoctor({ ...doctor, clinicName: e.target.value })}
-                      placeholder="Nombre del consultorio"
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </>
-          )}
-
-          {/* Step 2: Patient Info */}
-          {step === 2 && (
             <>
               <CardHeader>
                 <CardTitle className="text-xl font-semibold">Datos del Paciente</CardTitle>
@@ -422,8 +324,8 @@ export default function ProfessionalOrderWizard({ onBack }: ProfessionalOrderWiz
             </>
           )}
 
-          {/* Step 3: Clinic Selection */}
-          {step === 3 && (
+          {/* Step 2: Clinic Selection */}
+          {step === 2 && (
             <>
               <CardHeader>
                 <CardTitle className="text-xl font-semibold">Ubicación / Sucursal</CardTitle>
@@ -471,8 +373,8 @@ export default function ProfessionalOrderWizard({ onBack }: ProfessionalOrderWiz
             </>
           )}
 
-          {/* Step 4: Study Type Selection */}
-          {step === 4 && (
+          {/* Step 3: Study Type Selection */}
+          {step === 3 && (
             <>
               <CardHeader>
                 <CardTitle className="text-xl font-semibold">Tipo de Estudio</CardTitle>
@@ -533,8 +435,8 @@ export default function ProfessionalOrderWizard({ onBack }: ProfessionalOrderWiz
             </>
           )}
 
-          {/* Step 5: Study Details */}
-          {step === 5 && (
+          {/* Step 4: Study Details */}
+          {step === 4 && (
             <>
               <CardHeader>
                 <CardTitle className="text-xl font-semibold">Detalles del Estudio</CardTitle>
@@ -636,8 +538,8 @@ export default function ProfessionalOrderWizard({ onBack }: ProfessionalOrderWiz
             </>
           )}
 
-          {/* Step 6: Review */}
-          {step === 6 && (
+          {/* Step 5: Review */}
+          {step === 5 && (
             <>
               <CardHeader>
                 <CardTitle className="text-xl font-semibold">Revisión de la Solicitud</CardTitle>
@@ -649,10 +551,8 @@ export default function ProfessionalOrderWizard({ onBack }: ProfessionalOrderWiz
                   <div className="p-4 bg-zinc-50/55 dark:bg-zinc-900/50">
                     <span className="text-xs font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">Médico Solicitante</span>
                     <div className="mt-2 text-sm text-zinc-700 dark:text-zinc-300 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      <div><span className="font-medium text-zinc-950 dark:text-zinc-50">Nombre:</span> {doctor.firstName} {doctor.paternalLastName} {doctor.maternalLastName}</div>
-                      <div><span className="font-medium text-zinc-950 dark:text-zinc-50">Correo:</span> {doctor.email}</div>
-                      <div><span className="font-medium text-zinc-950 dark:text-zinc-50">Cédula:</span> {doctor.professionalLicense || 'N/A'}</div>
-                      <div><span className="font-medium text-zinc-950 dark:text-zinc-50">Consultorio:</span> {doctor.clinicName || 'N/A'}</div>
+                      <div><span className="font-medium text-zinc-950 dark:text-zinc-50">Nombre:</span> {access.doctor.firstName} {access.doctor.paternalLastName}</div>
+                      <div><span className="font-medium text-zinc-950 dark:text-zinc-50">Correo:</span> {access.doctor.email}</div>
                     </div>
                   </div>
 
@@ -717,7 +617,7 @@ export default function ProfessionalOrderWizard({ onBack }: ProfessionalOrderWiz
               <div />
             )}
 
-            {step < 6 ? (
+            {step < 5 ? (
               <Button onClick={handleNext}>
                 Siguiente
               </Button>

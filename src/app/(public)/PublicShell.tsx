@@ -6,73 +6,11 @@ import { usePathname } from 'next/navigation'
 
 import { Button } from '#/shared/components/ui/button'
 
-const focusLink =
-  'transition-colors duration-200 hover:text-pink-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-600 focus-visible:ring-offset-4'
+const focusLink = 'transition-colors duration-200 hover:text-pink-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-600 focus-visible:ring-offset-4'
+function anchorHref(anchor: string, pathname: string) { return pathname === '/' ? `#${anchor}` : `/#${anchor}` }
 
-function anchorHref(anchor: string, pathname: string) {
-  return pathname === '/' ? `#${anchor}` : `/#${anchor}`
-}
-
-export function PublicShell({ children }: { children: React.ReactNode }) {
+export function PublicShell({ children, accountNavigation }: { children: React.ReactNode; accountNavigation: { href: string; label: string } }) {
   const pathname = usePathname()
 
-  return (
-    <>
-      <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[60] focus:rounded-full focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-pink-700 focus:outline-none focus:ring-2 focus:ring-pink-600">Saltar al contenido</a>
-      <header className="sticky top-4 z-50 px-4">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between rounded-full border border-white/70 bg-[color-mix(in_oklab,var(--clinical-gray)_78%,white)]/90 px-5 shadow-[0_12px_32px_rgba(70,45,58,0.10)] backdrop-blur-xl sm:px-6 lg:px-8">
-          <Link href="/" className={`flex items-center gap-3 ${focusLink}`}>
-            <Image src="/image.svg" alt="Vitae" width={36} height={36} />
-            <span className="text-xl font-semibold tracking-[-0.04em]">vitae</span>
-          </Link>
-
-          <nav aria-label="Navegación principal" className="hidden items-center gap-7 text-sm font-medium text-zinc-600 md:flex">
-            <a href={anchorHref('servicios', pathname)} className={focusLink}>Servicios</a>
-            <a href={anchorHref('nosotros', pathname)} className={focusLink}>Nosotros</a>
-            <a href={anchorHref('estudios', pathname)} className={focusLink}>Estudios</a>
-            <a href={anchorHref('contacto', pathname)} className={focusLink}>Contacto</a>
-          </nav>
-
-          <Button asChild className="rounded-full bg-pink-600 px-5 text-white transition-colors hover:bg-pink-700 focus-visible:ring-pink-600">
-            <Link href="/appointments">Agendar cita</Link>
-          </Button>
-        </div>
-      </header>
-
-      <div id="main-content">{children}</div>
-
-      <footer className="border-t border-pink-100 bg-pink-50">
-        <div className="mx-auto grid max-w-7xl gap-10 px-6 py-12 sm:grid-cols-2 lg:grid-cols-3 lg:px-8">
-          <div>
-            <Link href="/" className={`flex items-center gap-3 ${focusLink}`}>
-              <Image src="/image.svg" alt="Vitae" width={32} height={32} />
-              <span className="text-xl font-semibold tracking-[-0.04em]">vitae</span>
-            </Link>
-            <p className="mt-4 max-w-xs text-sm leading-6 text-zinc-600">Atención dental enfocada en tu salud, tu tranquilidad y el seguimiento de tu sonrisa.</p>
-          </div>
-          <div>
-            <p className="text-sm font-semibold">Vitae</p>
-            <div className="mt-4 space-y-3 text-sm text-zinc-600">
-              <a href={anchorHref('servicios', pathname)} className={`block ${focusLink}`}>Servicios</a>
-              <a href={anchorHref('nosotros', pathname)} className={`block ${focusLink}`}>Nosotros</a>
-              <a href={anchorHref('contacto', pathname)} className={`block ${focusLink}`}>Contacto</a>
-            </div>
-          </div>
-          <div>
-            <p className="text-sm font-semibold">Profesionales</p>
-            <div className="mt-4 space-y-3 text-sm text-zinc-600">
-              <Link href="/appointments?tipo=doctor" className={`block ${focusLink}`}>Solicitar estudio</Link>
-              <Link href="/login" className={`block ${focusLink}`}>Acceso</Link>
-            </div>
-          </div>
-        </div>
-        <div className="border-t border-pink-100">
-          <div className="mx-auto flex max-w-7xl flex-col gap-3 px-6 py-6 text-sm text-zinc-500 sm:flex-row sm:justify-between lg:px-8">
-            <span>© 2026 Vitae. Todos los derechos reservados.</span>
-            <span>Tu salud comienza con una sonrisa.</span>
-          </div>
-        </div>
-      </footer>
-    </>
-  )
+  return <><a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[60] focus:rounded-full focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-pink-700 focus:outline-none focus:ring-2 focus:ring-pink-600">Saltar al contenido</a><header className="sticky top-4 z-50 px-4"><div className="mx-auto flex h-16 max-w-7xl items-center justify-between rounded-full border border-white/70 bg-[color-mix(in_oklab,var(--clinical-gray)_78%,white)]/90 px-5 shadow-[0_12px_32px_rgba(70,45,58,0.10)] backdrop-blur-xl sm:px-6 lg:px-8"><Link href="/" className={`flex items-center gap-3 ${focusLink}`}><Image src="/image.svg" alt="Vitae" width={36} height={36} /><span className="text-xl font-semibold tracking-[-0.04em]">vitae</span></Link><nav aria-label="Navegación principal" className="hidden items-center gap-7 text-sm font-medium text-zinc-600 md:flex"><a href={anchorHref('servicios', pathname)} className={focusLink}>Servicios</a><a href={anchorHref('nosotros', pathname)} className={focusLink}>Nosotros</a><a href={anchorHref('estudios', pathname)} className={focusLink}>Estudios</a><a href={anchorHref('contacto', pathname)} className={focusLink}>Contacto</a></nav><div className="flex items-center gap-2"><Link href={accountNavigation.href} className={`hidden whitespace-nowrap text-sm font-medium text-zinc-700 sm:inline-flex ${focusLink}`}>{accountNavigation.label}</Link><Button asChild className="rounded-full bg-pink-600 px-5 text-white transition-colors hover:bg-pink-700 focus-visible:ring-pink-600"><Link href="/appointments">Agendar cita</Link></Button></div></div></header><div id="main-content">{children}</div><footer className="border-t border-pink-100 bg-pink-50"><div className="mx-auto grid max-w-7xl gap-10 px-6 py-12 sm:grid-cols-2 lg:grid-cols-3 lg:px-8"><div><Link href="/" className={`flex items-center gap-3 ${focusLink}`}><Image src="/image.svg" alt="Vitae" width={32} height={32} /><span className="text-xl font-semibold tracking-[-0.04em]">vitae</span></Link><p className="mt-4 max-w-xs text-sm leading-6 text-zinc-600">Atención dental enfocada en tu salud, tu tranquilidad y el seguimiento de tu sonrisa.</p></div><div><p className="text-sm font-semibold">Vitae</p><div className="mt-4 space-y-3 text-sm text-zinc-600"><a href={anchorHref('servicios', pathname)} className={`block ${focusLink}`}>Servicios</a><a href={anchorHref('nosotros', pathname)} className={`block ${focusLink}`}>Nosotros</a><a href={anchorHref('contacto', pathname)} className={`block ${focusLink}`}>Contacto</a></div></div><div><p className="text-sm font-semibold">Profesionales</p><div className="mt-4 space-y-3 text-sm text-zinc-600"><Link href="/appointments?tipo=doctor" className={`block ${focusLink}`}>Solicitar estudio</Link><Link href="/login?redirect=/appointments" className={`block ${focusLink}`}>Acceso</Link></div></div></div><div className="border-t border-pink-100"><div className="mx-auto flex max-w-7xl flex-col gap-3 px-6 py-6 text-sm text-zinc-500 sm:flex-row sm:justify-between lg:px-8"><span>© 2026 Vitae. Todos los derechos reservados.</span><span>Tu salud comienza con una sonrisa.</span></div></div></footer></>
 }

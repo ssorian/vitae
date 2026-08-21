@@ -1,7 +1,9 @@
 'use server'
 
-import { createOrderSchema } from '#/modules/order/schemas/generalOrder'
+import { authenticatedProfessionalOrderSchema, createOrderSchema } from '#/modules/order/schemas/generalOrder'
 import { createOrder, findOrganization, listOrders, getOrderDetails, updateOrderStatus } from '#/modules/order/services/generalOrder'
+import { requireDoctorClient } from '#/modules/client/requireDoctorClient'
+import { getSession } from '#/infrastructure/auth/getSession'
 import { deliverOrderResults } from '#/modules/order/services/results'
 import { listClinics } from '#/modules/clinic/services/clinic'
 import { requireOrganization } from '#/infrastructure/auth/requireOrganization'
@@ -26,14 +28,49 @@ async function operationalAccess(clinicId?: string) {
   return { ...context, access, clinicId: undefined }
 }
 
-export async function createPublicOrderAction(values: unknown) {
-  const parsed = createOrderSchema.safeParse(values)
-  if (!parsed.success) return { success: false as const, error: 'INVALID_INPUT', issues: parsed.error.flatten() }
-  const org = await findOrganization()
-  if (!org) return { success: false as const, error: 'ORGANIZATION_NOT_FOUND' }
-  const clinics = await listClinics(org.id)
-  if (!clinics.some((clinic) => clinic.id === parsed.data.clinicId && clinic.laboratoryEnabled)) return { success: false as const, error: 'LABORATORY_DISABLED' }
-  const result = await createOrder({ organizationId: org.id, userId: null, source: 'public', data: parsed.data })
+export function professionalOrderAccessState(error: unknown) {
+  return error instanceof Error && error.message === 'UNAUTHORIZED'
+    ? { authenticated: false as const, active: false as const }
+    : { authenticated: true as const, active: false as const }
+}
+
+export async function getProfessionalOrderAccessAction() {
+  const session = await getSession()
+  if (!session?.user) return { authenticated: false as const, active: false as const }
+
+  try {
+    const context = await requireDoctorClient()
+    return {
+      authenticated: true as const,
+      active: true as const,
+      doctor: context.doctorClient,
+    }
+  } catch (error) {
+    return professionalOrderAccessState(error)
+  }
+}
+
+export async function createProfessionalOrderAction(values: unknown) {
+  let context
+  try {
+    context = await requireDoctorClient()
+  } catch (error) {
+    return { success: false as const, error: error instanceof Error && error.message === 'UNAUTHORIZED' ? 'UNAUTHORIZED' as const : 'DOCTOR_CLIENT_REQUIRED' as const }
+  }
+
+  const parsed = authenticatedProfessionalOrderSchema.safeParse(values)
+  if (!parsed.success) return { success: false as const, error: 'INVALID_INPUT' as const, issues: parsed.error.flatten() }
+
+  const clinics = await listClinics(context.organizationId)
+  if (!clinics.some((clinic) => clinic.id === parsed.data.clinicId && clinic.laboratoryEnabled)) return { success: false as const, error: 'LABORATORY_DISABLED' as const }
+
+  const result = await createOrder({
+    organizationId: context.organizationId,
+    userId: context.user.id,
+    source: 'public',
+    data: parsed.data,
+    trustedDoctorClientId: context.doctorClient.id,
+  })
   return { success: true as const, data: { orderId: result.order.id, folio: result.order.folio } }
 }
 
