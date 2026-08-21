@@ -1,6 +1,6 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
 
-export const resultGrantLifetimeMs = 72 * 60 * 60 * 1000
+export const resultGrantLifetimeMs = 30 * 24 * 60 * 60 * 1000
 export const resultSessionLifetimeMs = 15 * 60 * 1000
 export const resultGrantCookieName = 'vitae_order_result'
 
@@ -32,6 +32,11 @@ export function grantCookieValue(orderId: string, grantId: string) { return `${o
 export function parseGrantCookie(value: string | undefined) {
   const [orderId, grantId, ...rest] = value?.split('.') ?? []
   return orderId && grantId && rest.length === 0 ? { orderId, grantId } : null
+}
+
+export function sanitizeDownloadFilename(name: string, fallback = 'resultado') {
+  const filename = name.replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_').replace(/\.+$/g, '').trim()
+  return filename || fallback
 }
 
 // ponytail: process-local limiter; replace with shared store when deployments need cross-instance enforcement.

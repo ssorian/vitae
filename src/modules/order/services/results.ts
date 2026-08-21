@@ -1,16 +1,18 @@
-import { and, eq, inArray, isNotNull, type SQL } from 'drizzle-orm'
+import { Readable, Transform } from 'node:stream'
+import { ZipArchive } from 'archiver'
+import { and, eq, isNotNull, type SQL } from 'drizzle-orm'
 import { createClient } from '@supabase/supabase-js'
 import { Resend } from 'resend'
 
 import { db } from '#/infrastructure/database'
 import { order, orderAsset, orderEvent, orderResult, orderResultGrant } from '#/modules/order/db/schema'
 import { ResultReadyEmail } from '#/modules/order/emails/ResultReadyEmail'
-import { createResultAccessCode, createResultGrantToken, hashResultAccessSecret, hasUsableResultGrant, resultGrantExpiresAt, selectResultDeliveryTarget } from '#/modules/order/resultAccess'
+import { createResultAccessCode, createResultGrantToken, hashResultAccessSecret, hasUsableResultGrant, resultGrantExpiresAt, sanitizeDownloadFilename, selectResultDeliveryTarget } from '#/modules/order/resultAccess'
 
 const MAX_IMAGE_FILES = 10
 const MAX_DICOM_FILES = 500
 const MAX_FILE_BYTES = 500 * 1024 * 1024
-const MAX_REQUEST_BYTES = 500 * 1024 * 1024
+const MAX_TOTAL_BYTES = 500 * 1024 * 1024
 const RESULTS_BUCKET = process.env.SUPABASE_RESULTS_BUCKET || 'order-results'
 
 function requiredEnv(name: 'SUPABASE_URL' | 'SUPABASE_SERVICE_ROLE_KEY' | 'RESEND_API_KEY' | 'RESEND_FROM_EMAIL') {
@@ -52,7 +54,7 @@ export async function uploadOrderResult(
 ) {
   if (!input.files.length) throw new Error('INVALID_FILE_COUNT')
   const totalBytes = input.files.reduce((total, file) => total + file.size, 0)
-  if (totalBytes > MAX_REQUEST_BYTES || input.files.some((file) => file.size > MAX_FILE_BYTES)) throw new Error('FILE_TOO_LARGE')
+  if (totalBytes > MAX_TOTAL_BYTES || input.files.some((file) => file.size > MAX_FILE_BYTES)) throw new Error('FILE_TOO_LARGE')
 
   const typedFiles = input.files.map((file) => ({ file, type: assetType(file) }))
   if (typedFiles.some(({ type }) => !type)) throw new Error('UNSUPPORTED_FILE_TYPE')
@@ -108,7 +110,7 @@ export async function uploadOrderResult(
 export async function deliverOrderResults(organizationId: string, orderId: string, userId: string) {
   const existing = await db.query.order.findFirst({
     where: { id: orderId, organizationId },
-    with: { patientHistory: { with: { patient: { with: { account: { with: { user: true } } } } } }, results: true },
+    with: { patientHistory: { with: { patient: { with: { account: { with: { user: true } } } } } }, results: true, assets: true },
   })
   if (!existing) throw new Error('ORDER_NOT_FOUND')
   if (existing.status !== 'ready' || !existing.results.length) throw new Error('ORDER_NOT_READY')
@@ -119,18 +121,16 @@ export async function deliverOrderResults(organizationId: string, orderId: strin
   let resultUrl: string
   let recipient: string | null = null
   let accessCode: string | null = null
-  if (target.kind === 'account') {
-    resultUrl = `${process.env.BETTER_AUTH_URL}/patient/${target.patientId}/studies/${orderId}`
-    recipient = target.email
-    const { error } = await new Resend(requiredEnv('RESEND_API_KEY')).emails.send({ from: requiredEnv('RESEND_FROM_EMAIL'), to: recipient, subject: `Resultados de estudio listos - Folio ${existing.folio}`, react: ResultReadyEmail({ folio: existing.folio, resultUrl }) })
-    if (error) throw new Error(`RESULT_EMAIL_FAILED:${error.message}`)
-  } else if (target.kind === 'email') {
+  let grantId: string | null = null
+  if (target.kind !== 'code') {
     const token = createResultGrantToken()
     const [grant] = await db.insert(orderResultGrant).values({ orderId, kind: 'email', secretHash: hashResultAccessSecret(token), expiresAt: resultGrantExpiresAt(), createdByUserId: userId }).returning()
+    grantId = grant.id
     resultUrl = `${process.env.BETTER_AUTH_URL}/order/access/${token}`
     recipient = target.email
     try {
-      const { error } = await new Resend(requiredEnv('RESEND_API_KEY')).emails.send({ from: requiredEnv('RESEND_FROM_EMAIL'), to: recipient, subject: `Resultados de estudio listos - Folio ${existing.folio}`, react: ResultReadyEmail({ folio: existing.folio, resultUrl }) })
+      const viewerUrl = existing.assets.some((asset) => asset.type === 'dicom') ? `${resultUrl}?destination=viewer` : resultUrl
+      const { error } = await new Resend(requiredEnv('RESEND_API_KEY')).emails.send({ from: requiredEnv('RESEND_FROM_EMAIL'), to: recipient, subject: `Resultados de estudio listos - Folio ${existing.folio}`, react: ResultReadyEmail({ folio: existing.folio, viewerUrl, downloadUrl: `${resultUrl}?destination=download` }) })
       if (error) throw new Error(`RESULT_EMAIL_FAILED:${error.message}`)
     } catch (error) {
       await db.update(orderResultGrant).set({ revokedAt: new Date() }).where(eq(orderResultGrant.id, grant.id))
@@ -139,26 +139,32 @@ export async function deliverOrderResults(organizationId: string, orderId: strin
   } else {
     accessCode = createResultAccessCode()
     try {
-      await db.insert(orderResultGrant).values({ orderId, kind: 'code', secretHash: hashResultAccessSecret(accessCode), expiresAt: resultGrantExpiresAt(), createdByUserId: userId })
+      const [grant] = await db.insert(orderResultGrant).values({ orderId, kind: 'code', secretHash: hashResultAccessSecret(accessCode), expiresAt: resultGrantExpiresAt(), createdByUserId: userId }).returning()
+      grantId = grant.id
     } catch {
       throw new Error('ORDER_ACCESS_CODE_ALREADY_ISSUED')
     }
     resultUrl = '/order'
   }
 
-  return db.transaction(async (tx) => {
-    const [updated] = await tx.update(order).set({ status: 'delivered', deliveredAt: new Date(), updatedAt: new Date() }).where(and(eq(order.id, orderId), eq(order.status, 'ready'))).returning()
-    if (!updated) throw new Error('ORDER_NOT_READY')
-    await tx.insert(orderEvent).values([
-      ...(recipient ? [{ orderId, type: 'email.sent' as const, userId, metadata: { to: recipient, subject: `Resultados de estudio listos - Folio ${existing.folio}`, secureLink: '/order/access/[redacted]' } }] : []),
-      { orderId, type: 'order.delivered' as const, userId, metadata: {} },
-    ])
-    return { order: updated, accessCode }
-  })
+  try {
+    return await db.transaction(async (tx) => {
+      const [updated] = await tx.update(order).set({ status: 'delivered', deliveredAt: new Date(), updatedAt: new Date() }).where(and(eq(order.id, orderId), eq(order.status, 'ready'))).returning()
+      if (!updated) throw new Error('ORDER_NOT_READY')
+      await tx.insert(orderEvent).values([
+        ...(recipient ? [{ orderId, type: 'email.sent' as const, userId, metadata: { to: recipient, subject: `Resultados de estudio listos - Folio ${existing.folio}`, secureLink: '/order/access/[redacted]' } }] : []),
+        { orderId, type: 'order.delivered' as const, userId, metadata: {} },
+      ])
+      return { order: updated, accessCode }
+    })
+  } catch (error) {
+    if (grantId) await db.update(orderResultGrant).set({ revokedAt: new Date() }).where(eq(orderResultGrant.id, grantId))
+    throw error
+  }
 }
 
 async function findUsableGrant(where: SQL) {
-  const [found] = await db.select({ grant: orderResultGrant, order, result: orderResult }).from(orderResultGrant).innerJoin(order, eq(orderResultGrant.orderId, order.id)).innerJoin(orderResult, eq(orderResult.orderId, order.id)).where(and(where, inArray(order.status, ['ready', 'delivered']), isNotNull(orderResult.finalizedAt)))
+  const [found] = await db.select({ grant: orderResultGrant, order, result: orderResult }).from(orderResultGrant).innerJoin(order, eq(orderResultGrant.orderId, order.id)).innerJoin(orderResult, eq(orderResult.orderId, order.id)).where(and(where, eq(order.status, 'delivered'), isNotNull(orderResult.finalizedAt)))
   return found && hasUsableResultGrant(found.grant) ? found : null
 }
 
@@ -185,6 +191,77 @@ export async function getGrantedAssetUrl(orderId: string, grantId: string, asset
   const { data, error } = await storage().storage.from(RESULTS_BUCKET).createSignedUrl(asset.storageKey, 60)
   if (error || !data) throw new Error(`RESULT_URL_FAILED:${error?.message ?? 'unknown'}`)
   return data.signedUrl
+}
+
+export async function getGrantedViewerAssets(orderId: string, grantId: string) {
+  const found = await getGrantedOrder(orderId, grantId)
+  if (!found) return null
+  const assets = found.assets.filter((asset) => asset.type === 'dicom')
+  return assets.length ? { type: found.type, assets: await signedViewerAssets(assets) } : null
+}
+
+export async function getGrantedAssetDownload(orderId: string, grantId: string, assetId: string) {
+  const found = await getGrantedOrder(orderId, grantId)
+  const asset = found?.assets.find((item) => item.id === assetId)
+  if (!asset) return null
+  const url = await getGrantedAssetUrl(orderId, grantId, assetId)
+  if (!url) return null
+  const response = await fetch(url, { cache: 'no-store' })
+  if (!response.ok || !response.body) throw new Error('RESULT_DOWNLOAD_FAILED')
+  return { body: response.body, contentType: response.headers.get('content-type') || 'application/octet-stream', name: sanitizeDownloadFilename(asset.name) }
+}
+
+export async function getGrantedAssetsArchive(orderId: string, grantId: string) {
+  const found = await getGrantedOrder(orderId, grantId)
+  if (!found || found.assets.length < 2) return null
+  if (found.assets.length > MAX_DICOM_FILES) throw new Error('RESULT_ARCHIVE_TOO_LARGE')
+
+  const archive = new ZipArchive({ forceZip64: true, zlib: { level: 0 } })
+  const controller = new AbortController()
+  let knownBytes = 0
+  let streamedBytes = 0
+  const failArchive = (error: Error) => {
+    controller.abort(error)
+    archive.destroy(error)
+  }
+  void (async () => {
+    try {
+      for (const asset of found.assets) {
+        const { data, error } = await storage().storage.from(RESULTS_BUCKET).createSignedUrl(asset.storageKey, 60)
+        if (error || !data) throw new Error(`RESULT_URL_FAILED:${error?.message ?? 'unknown'}`)
+        const response = await fetch(data.signedUrl, { cache: 'no-store', signal: controller.signal })
+        if (!response.ok || !response.body) throw new Error('RESULT_DOWNLOAD_FAILED')
+        const contentLength = response.headers.get('content-length')
+        if (contentLength !== null) {
+          const bytes = Number(contentLength)
+          if (!Number.isSafeInteger(bytes) || bytes < 0 || knownBytes + bytes > MAX_TOTAL_BYTES) throw new Error('RESULT_ARCHIVE_TOO_LARGE')
+          knownBytes += bytes
+        }
+        const source = Readable.fromWeb(response.body as unknown as import('node:stream/web').ReadableStream)
+        const guard = new Transform({
+          transform(chunk, _encoding, callback) {
+            streamedBytes += chunk.length
+            if (streamedBytes > MAX_TOTAL_BYTES) {
+              const limitError = new Error('RESULT_ARCHIVE_TOO_LARGE')
+              source.destroy(limitError)
+              failArchive(limitError)
+              callback(limitError)
+              return
+            }
+            callback(null, chunk)
+          },
+        })
+        source.on('error', failArchive)
+        guard.on('error', failArchive)
+        archive.append(source.pipe(guard), { name: sanitizeDownloadFilename(asset.name) })
+      }
+      await archive.finalize()
+    } catch (error) {
+      failArchive(error instanceof Error ? error : new Error('RESULT_ARCHIVE_FAILED'))
+    }
+  })()
+
+  return { body: Readable.toWeb(archive) as unknown as ReadableStream<Uint8Array>, name: `${sanitizeDownloadFilename(`resultados-${found.folio}`)}.zip` }
 }
 
 export async function getDoctorResult(orderId: string, email: string) {
