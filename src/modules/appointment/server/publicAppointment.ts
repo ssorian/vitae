@@ -8,6 +8,7 @@ import { db } from '#/infrastructure/database'
 import { patient } from '#/modules/patient/db/schema'
 
 import { publicAvailabilityInputSchema, publicBookingInputSchema, publicExistingBookingInputSchema, publicExistingStudyBookingInputSchema, publicStudyBookingInputSchema } from '../schemas/appointment'
+import type { orderStudyTypes } from '#/modules/order/schemas/studyCatalog'
 import { createPublicAppointment, createPublicStudyOrder, getPublicAvailableSlots, listPublicClinics } from '../services/appointment'
 
 export async function listPublicBookingClinicsAction() { return listPublicClinics() }
@@ -73,6 +74,6 @@ async function createExistingPublicAppointment(input: { clinicPublicSlug: string
   return createPublicAppointment({ ...input, firstName: 'Paciente' }, undefined, true)
 }
 
-async function createExistingPublicStudyOrder(input: { clinicPublicSlug: string; startsAt: Date; phone?: string; email?: string; type: 'radiography' | 'cbct'; details: Record<string, unknown>; doctor?: { firstName: string; paternalLastName: string; maternalLastName?: string; professionalLicense?: string; specialty?: string; clinicName?: string; phone?: string; email: string } }) {
+async function createExistingPublicStudyOrder(input: { clinicPublicSlug: string; startsAt: Date; phone?: string; email?: string; type: Exclude<(typeof orderStudyTypes)[number], 'endodontic_evaluation'>; details: Record<string, unknown>; doctor?: { firstName: string; paternalLastName: string; maternalLastName?: string; professionalLicense?: string; specialty?: string; clinicName?: string; phone?: string; email: string } }) {
   return createPublicStudyOrder({ ...input, firstName: 'Paciente' }, undefined, true)
 }

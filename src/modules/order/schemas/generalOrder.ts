@@ -1,5 +1,8 @@
 import { z } from 'zod'
 
+export { cbctDetailsSchema, radiographyDetailsSchema } from './studyCatalog'
+import { alignerPackageDetailsSchema, cbctDetailsSchema, cephalometricAnalysisDetailsSchema, endodonticEvaluationDetailsSchema, intraoralScanDetailsSchema, laboratoryOrderDetailsSchema, orthodonticPackageDetailsSchema, radiography2dDetailsSchema, radiographyDetailsSchema, studyModelsDetailsSchema } from './studyCatalog'
+
 export const doctorClientSchema = z.object({
   firstName: z.string().trim().min(1, 'El nombre es obligatorio').max(100),
   paternalLastName: z.string().trim().min(1, 'El apellido paterno es obligatorio').max(100),
@@ -57,63 +60,18 @@ export const patientSchema = z.object({
     .optional(),
 })
 
-export const radiographyDetailsSchema = z.object({
-  radiographyType: z.string().trim().min(1, 'El tipo de radiografía es obligatorio'),
-  region: z.string().trim().min(1, 'La pieza o región es obligatoria'),
-  clinicalIndication: z.string().trim().min(1, 'La indicación clínica es obligatoria'),
-  notes: z.string().trim().optional(),
-})
+const studyTypes = ['radiography', 'radiography_2d', 'cbct', 'cephalometric_analysis', 'study_models', 'intraoral_scan', 'orthodontic_package', 'aligner_package', 'laboratory_order', 'endodontic_evaluation'] as const
+export const orderGeneralSchema = z.object({ type: z.enum(studyTypes), doctor: doctorClientSchema, patient: patientSchema })
 
-export const cbctDetailsSchema = z.object({
-  anatomicalRegion: z.string().trim().min(1, 'La región anatómica es obligatoria'),
-  specificArea: z.string().trim().min(1, 'El área específica es obligatoria'),
-  clinicalIndication: z.string().trim().min(1, 'La indicación clínica es obligatoria'),
-  notes: z.string().trim().optional(),
-})
+const orderVariant = <T extends typeof studyTypes[number], S extends z.ZodTypeAny>(type: T, details: S) => z.object({ type: z.literal(type), doctor: doctorClientSchema, patient: patientSchema, clinicId: z.string().uuid('La clínica es obligatoria'), details }).strict()
+const professionalOrderVariant = <T extends typeof studyTypes[number], S extends z.ZodTypeAny>(type: T, details: S) => z.object({ type: z.literal(type), patient: patientSchema, clinicId: z.string().uuid('La clínica es obligatoria'), details }).strict()
 
-export const orderGeneralSchema = z.object({
-  type: z.enum([
-    'radiography',
-    'cbct',
-  ]),
-
-  doctor: doctorClientSchema,
-
-  patient: patientSchema,
-})
-
-export const createOrderSchema = z.discriminatedUnion('type', [
-  z.object({
-    type: z.literal('radiography'),
-    doctor: doctorClientSchema,
-    patient: patientSchema,
-    clinicId: z.string().uuid('La clínica es obligatoria'),
-    details: radiographyDetailsSchema,
-  }),
-  z.object({
-    type: z.literal('cbct'),
-    doctor: doctorClientSchema,
-    patient: patientSchema,
-    clinicId: z.string().uuid('La clínica es obligatoria'),
-    details: cbctDetailsSchema,
-  }),
+export const createOrderSchema = z.union([
+  orderVariant('radiography', radiographyDetailsSchema), orderVariant('radiography_2d', radiography2dDetailsSchema), orderVariant('cbct', cbctDetailsSchema), orderVariant('cephalometric_analysis', cephalometricAnalysisDetailsSchema), orderVariant('study_models', studyModelsDetailsSchema), orderVariant('intraoral_scan', intraoralScanDetailsSchema), orderVariant('orthodontic_package', orthodonticPackageDetailsSchema), orderVariant('aligner_package', alignerPackageDetailsSchema), orderVariant('laboratory_order', laboratoryOrderDetailsSchema), orderVariant('endodontic_evaluation', endodonticEvaluationDetailsSchema),
 ])
-
 // The requesting professional is derived from the authenticated server session.
-// This browser payload intentionally has no doctor identity or profile fields.
-export const authenticatedProfessionalOrderSchema = z.discriminatedUnion('type', [
-  z.object({
-    type: z.literal('radiography'),
-    patient: patientSchema,
-    clinicId: z.string().uuid('La clínica es obligatoria'),
-    details: radiographyDetailsSchema,
-  }).strict(),
-  z.object({
-    type: z.literal('cbct'),
-    patient: patientSchema,
-    clinicId: z.string().uuid('La clínica es obligatoria'),
-    details: cbctDetailsSchema,
-  }).strict(),
+export const authenticatedProfessionalOrderSchema = z.union([
+  professionalOrderVariant('radiography', radiographyDetailsSchema), professionalOrderVariant('radiography_2d', radiography2dDetailsSchema), professionalOrderVariant('cbct', cbctDetailsSchema), professionalOrderVariant('cephalometric_analysis', cephalometricAnalysisDetailsSchema), professionalOrderVariant('study_models', studyModelsDetailsSchema), professionalOrderVariant('intraoral_scan', intraoralScanDetailsSchema), professionalOrderVariant('orthodontic_package', orthodonticPackageDetailsSchema), professionalOrderVariant('aligner_package', alignerPackageDetailsSchema), professionalOrderVariant('laboratory_order', laboratoryOrderDetailsSchema), professionalOrderVariant('endodontic_evaluation', endodonticEvaluationDetailsSchema),
 ])
 
 export type DoctorClientInput =

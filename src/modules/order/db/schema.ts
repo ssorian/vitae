@@ -16,7 +16,7 @@ import { doctorClient } from '#/modules/client/db/schema'
 import { clinic } from '#/modules/clinic/db/schema'
 
 export const orderSource = pgEnum('order_source', ['public', 'internal'])
-export const orderType = pgEnum('order_type', ['radiography', 'cbct'])
+export const orderType = pgEnum('order_type', ['radiography', 'radiography_2d', 'cbct', 'cephalometric_analysis', 'study_models', 'intraoral_scan', 'orthodontic_package', 'aligner_package', 'laboratory_order', 'endodontic_evaluation'])
 export const orderStatus = pgEnum('order_status', ['draft', 'received', 'scheduled', 'in_progress', 'ready', 'delivered', 'cancelled'])
 
 export const order = pgTable('order', {

@@ -1,5 +1,6 @@
 import { z } from 'zod'
-import { cbctDetailsSchema, doctorClientSchema, radiographyDetailsSchema } from '#/modules/order/schemas/generalOrder'
+import { doctorClientSchema } from '#/modules/order/schemas/generalOrder'
+import { alignerPackageDetailsSchema, cbctDetailsSchema, cephalometricAnalysisDetailsSchema, intraoralScanDetailsSchema, laboratoryOrderDetailsSchema, orthodonticPackageDetailsSchema, radiography2dDetailsSchema, radiographyDetailsSchema, studyModelsDetailsSchema } from '#/modules/order/schemas/studyCatalog'
 import { newPatientInputSchema, normalizePatientContact } from '#/modules/patient/schemas/patient'
 
 export { normalizePatientContact }
@@ -17,11 +18,11 @@ export const publicAvailabilityInputSchema = z.object({ clinicPublicSlug: z.stri
 export const publicBookingInputSchema = z.object({ clinicPublicSlug: z.string().trim().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).max(160), startsAt: z.coerce.date(), firstName: publicText, paternalLastName: z.string().trim().max(120).optional(), maternalLastName: z.string().trim().max(120).optional(), phone: z.string().trim().max(40).optional(), email: z.string().trim().email().max(254).optional() }).superRefine((value, context) => { if (!value.phone?.replace(/[^0-9]/g, '') && !value.email) context.addIssue({ code: z.ZodIssueCode.custom, message: 'Se requiere teléfono o correo.' }) })
 const publicExistingPatientInputSchema = z.object({ clinicPublicSlug: z.string().trim().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).max(160), startsAt: z.coerce.date(), phone: z.string().trim().max(40).optional(), email: z.string().trim().email().max(254).optional() }).superRefine((value, context) => { if (!value.phone?.replace(/[^0-9]/g, '') && !value.email) context.addIssue({ code: z.ZodIssueCode.custom, message: 'Se requiere teléfono o correo.' }) })
 export const publicExistingBookingInputSchema = publicExistingPatientInputSchema
-export const publicStudyBookingInputSchema = z.discriminatedUnion('type', [
-  publicBookingInputSchema.extend({ type: z.literal('radiography'), details: radiographyDetailsSchema, doctor: doctorClientSchema.optional() }),
-  publicBookingInputSchema.extend({ type: z.literal('cbct'), details: cbctDetailsSchema, doctor: doctorClientSchema.optional() }),
+const publicStudyVariant = <T extends string, S extends z.ZodTypeAny>(type: T, details: S) => publicBookingInputSchema.extend({ type: z.literal(type), details, doctor: doctorClientSchema.optional() })
+const existingPublicStudyVariant = <T extends string, S extends z.ZodTypeAny>(type: T, details: S) => publicExistingPatientInputSchema.extend({ type: z.literal(type), details, doctor: doctorClientSchema.optional() })
+export const publicStudyBookingInputSchema = z.union([
+  publicStudyVariant('radiography', radiographyDetailsSchema), publicStudyVariant('radiography_2d', radiography2dDetailsSchema), publicStudyVariant('cbct', cbctDetailsSchema), publicStudyVariant('cephalometric_analysis', cephalometricAnalysisDetailsSchema), publicStudyVariant('study_models', studyModelsDetailsSchema), publicStudyVariant('intraoral_scan', intraoralScanDetailsSchema), publicStudyVariant('orthodontic_package', orthodonticPackageDetailsSchema), publicStudyVariant('aligner_package', alignerPackageDetailsSchema), publicStudyVariant('laboratory_order', laboratoryOrderDetailsSchema),
 ])
-export const publicExistingStudyBookingInputSchema = z.discriminatedUnion('type', [
-  publicExistingPatientInputSchema.extend({ type: z.literal('radiography'), details: radiographyDetailsSchema, doctor: doctorClientSchema.optional() }),
-  publicExistingPatientInputSchema.extend({ type: z.literal('cbct'), details: cbctDetailsSchema, doctor: doctorClientSchema.optional() }),
+export const publicExistingStudyBookingInputSchema = z.union([
+  existingPublicStudyVariant('radiography', radiographyDetailsSchema), existingPublicStudyVariant('radiography_2d', radiography2dDetailsSchema), existingPublicStudyVariant('cbct', cbctDetailsSchema), existingPublicStudyVariant('cephalometric_analysis', cephalometricAnalysisDetailsSchema), existingPublicStudyVariant('study_models', studyModelsDetailsSchema), existingPublicStudyVariant('intraoral_scan', intraoralScanDetailsSchema), existingPublicStudyVariant('orthodontic_package', orthodonticPackageDetailsSchema), existingPublicStudyVariant('aligner_package', alignerPackageDetailsSchema), existingPublicStudyVariant('laboratory_order', laboratoryOrderDetailsSchema),
 ])

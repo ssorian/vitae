@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import type { orderStudyTypes } from '#/modules/order/schemas/studyCatalog'
 
 export type ViewerAsset = {
   id: string
@@ -10,7 +11,7 @@ export type ViewerAsset = {
 }
 
 export type ViewerProps = {
-  type: 'radiography' | 'cbct'
+  type: (typeof orderStudyTypes)[number]
   assets: ViewerAsset[]
 }
 
@@ -192,7 +193,7 @@ async function createRuntime({ id, type, imageIds, root }: { id: string; type: V
   group.setToolActive(tools.StackScrollTool.toolName, { bindings: [{ mouseButton: tools.Enums.MouseBindings.Wheel }] })
   if (type === 'cbct') group.setToolEnabled(tools.CrosshairsTool.toolName)
 
-  if (type === 'radiography') {
+  if (type !== 'cbct') {
     const viewport = engine.getViewport(viewportIds[0])
     if (!(viewport instanceof cornerstone.StackViewport)) throw new Error('Could not create stack viewport')
     await viewport.setStack(imageIds)
