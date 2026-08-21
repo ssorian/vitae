@@ -1,93 +1,51 @@
 'use client'
+/* eslint-disable react-hooks/set-state-in-effect */
 
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Send } from 'lucide-react'
 
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '#/shared/components/ui/alert-dialog'
 import { Badge } from '#/shared/components/ui/badge'
 import { Button } from '#/shared/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '#/shared/components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '#/shared/components/ui/card'
 import { getOrderDetailsAction, updateOrderStatusAction, deliverOrderResultsAction } from '#/modules/order/server/generalOrder'
 import { scheduleOrderAppointmentAction } from '#/modules/appointment/server/appointment'
 import { StudyDetailsSummary } from './StudyDetailsSummary'
 
 type OrderDetails = NonNullable<Awaited<ReturnType<typeof getOrderDetailsAction>>>
 type Props = { orderId: string; ordersPath: string; viewerPath: string }
-
 const STATUS_LABELS: Record<string, string> = { draft: 'Borrador', received: 'Recibida', scheduled: 'Agendada', in_progress: 'En proceso', ready: 'Lista', delivered: 'Entregada', cancelled: 'Cancelada' }
 const SEX_LABELS: Record<string, string> = { male: 'Masculino', female: 'Femenino', other: 'Otro', unspecified: 'No especificado' }
 const EVENT_LABELS: Record<string, string> = { 'order.created': 'Orden creada', 'order.scheduled': 'Estudio agendado', 'order.started': 'Estudio iniciado', 'result.uploaded': 'Archivo de resultado adjuntado', 'result.finalized': 'Resultado finalizado', 'email.sent': 'Resultados enviados por correo', 'order.delivered': 'Resultados entregados', 'order.cancelled': 'Orden cancelada' }
+const dateTime = (value: Date | string | null | undefined) => value ? new Date(value).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' }) : '—'
+const personName = (person: { firstName?: string | null; paternalLastName?: string | null; maternalLastName?: string | null }) => [person.firstName, person.paternalLastName, person.maternalLastName].filter(Boolean).join(' ') || '—'
 
 export function OrderDetail({ orderId, ordersPath, viewerPath }: Props) {
   const router = useRouter()
   const [order, setOrder] = useState<OrderDetails | null>(null)
   const [slot, setSlot] = useState('')
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [accessCode, setAccessCode] = useState<string | null>(null)
-
-  const loadOrder = useCallback(async () => {
-    try {
-      const data = await getOrderDetailsAction(orderId)
-      setOrder(data ?? null)
-    } finally { setLoading(false) }
-  }, [orderId])
-
+  const loadOrder = useCallback(async () => { setLoading(true); setLoadError(''); try { setOrder(await getOrderDetailsAction(orderId) ?? null) } catch (cause) { setLoadError(cause instanceof Error ? cause.message : 'No se pudo cargar la orden.') } finally { setLoading(false) } }, [orderId])
   useEffect(() => { void loadOrder() }, [loadOrder])
+  async function scheduleStudy() { if (!order || !slot) return; setSubmitting(true); setError(''); try { const startsAt = new Date(slot); await scheduleOrderAppointmentAction({ orderId: order.id, startsAt, endsAt: new Date(startsAt.getTime() + 30 * 60000) }); await loadOrder() } catch { setError('No se pudo agendar el estudio.') } finally { setSubmitting(false) } }
+  async function cancel() { if (!order) return; setSubmitting(true); setError(''); try { await updateOrderStatusAction(order.id, 'cancelled'); await loadOrder() } catch { setError('No se pudo cancelar la orden.') } finally { setSubmitting(false) } }
+  async function uploadResult(event: React.FormEvent<HTMLFormElement>) { event.preventDefault(); if (!order) return; setSubmitting(true); setError(''); try { const response = await fetch(`/api/org/orders/${order.id}/result`, { method: 'POST', body: new FormData(event.currentTarget) }); const body = await response.json(); if (!response.ok) throw new Error(body.error); event.currentTarget.reset(); await loadOrder() } catch (cause) { setError(cause instanceof Error ? cause.message : 'No se pudieron adjuntar los resultados.') } finally { setSubmitting(false) } }
+  async function deliver() { if (!order) return; setSubmitting(true); setError(''); try { const delivered = await deliverOrderResultsAction(order.id); setAccessCode(delivered.accessCode); await loadOrder() } catch (cause) { setError(cause instanceof Error ? cause.message : 'No se pudieron enviar los resultados.') } finally { setSubmitting(false) } }
 
-  async function scheduleStudy() {
-    if (!order || !slot) return
-    setSubmitting(true)
-    try { const startsAt = new Date(slot); await scheduleOrderAppointmentAction({ orderId: order.id, startsAt, endsAt: new Date(startsAt.getTime() + 30 * 60000) }); await loadOrder() } catch { setError('No se pudo agendar el estudio.') } finally { setSubmitting(false) }
-  }
+  if (loading) return <div className="space-y-4" aria-label="Cargando orden"><div className="h-20 animate-pulse rounded-xl bg-muted" /><div className="grid gap-4 lg:grid-cols-3"><div className="h-64 animate-pulse rounded-xl bg-muted lg:col-span-2" /><div className="h-64 animate-pulse rounded-xl bg-muted" /></div></div>
+  if (loadError) return <div className="rounded-xl border border-destructive/30 p-5" role="alert"><p className="font-medium">No se pudo cargar la orden.</p><p className="mt-1 text-sm text-muted-foreground">{loadError}</p><Button className="mt-4" variant="outline" onClick={() => void loadOrder()}>Reintentar</Button></div>
+  if (!order) return <div className="py-20 text-center"><p>Orden no encontrada.</p><Button className="mt-3" variant="ghost" onClick={() => router.push(ordersPath)}>Volver a órdenes</Button></div>
 
-  async function cancel() {
-    if (!order) return
-    setSubmitting(true)
-    try { await updateOrderStatusAction(order.id, 'cancelled'); await loadOrder() } catch { setError('No se pudo actualizar la orden.') } finally { setSubmitting(false) }
-  }
-
-  async function uploadResult(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    if (!order) return
-    setSubmitting(true); setError('')
-    try {
-      const response = await fetch(`/api/org/orders/${order.id}/result`, { method: 'POST', body: new FormData(event.currentTarget) })
-      const body = await response.json()
-      if (!response.ok) throw new Error(body.error)
-      event.currentTarget.reset()
-      await loadOrder()
-    } catch (cause) { setError(cause instanceof Error ? cause.message : 'No se pudieron adjuntar los resultados.') } finally { setSubmitting(false) }
-  }
-
-  async function deliver() {
-    if (!order) return
-    setSubmitting(true); setError('')
-    try { const delivered = await deliverOrderResultsAction(order.id); setAccessCode(delivered.accessCode); await loadOrder() } catch (cause) { setError(cause instanceof Error ? cause.message : 'No se pudieron enviar los resultados.') } finally { setSubmitting(false) }
-  }
-
-  if (loading) return <div className="py-20 text-center text-zinc-400">Cargando orden...</div>
-  if (!order) return <div className="py-20 text-center"><p>Orden no encontrada.</p><Button variant="ghost" onClick={() => router.push(ordersPath)}>Volver a órdenes</Button></div>
-
-  const patient = order.patientHistory?.patient
-  const doctor = order.doctorClient
-  const details = order.details
-  const result = order.results?.[0]
-  const hasViewerAssets = order.assets?.some((asset) => asset.type === 'dicom' || asset.type === 'image')
-  const canAttachResult = !result && !['delivered', 'cancelled'].includes(order.status)
-
-  return <div className="mx-auto flex w-full flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
-    <header className="flex items-start justify-between gap-4"><div className="flex items-center gap-3"><Button variant="ghost" size="sm" onClick={() => router.push(ordersPath)}><ArrowLeft className="mr-1 h-4 w-4" />Órdenes</Button><div><p className="font-mono font-bold text-primary">{order.folio}</p><Badge>{STATUS_LABELS[order.status] ?? order.status}</Badge></div></div><div className="flex flex-wrap gap-2">{order.status === 'received' && <><input className="rounded border p-2 text-xs" type="datetime-local" value={slot} onChange={(event) => setSlot(event.target.value)} /><Button size="sm" disabled={submitting || !slot} onClick={scheduleStudy}>Agendar estudio</Button></>}{['received', 'scheduled', 'in_progress'].includes(order.status) && <Button variant="destructive" size="sm" disabled={submitting} onClick={cancel}>Cancelar</Button>}{order.status === 'ready' && <Button size="sm" disabled={submitting} onClick={deliver}><Send className="mr-2 h-4 w-4" />{submitting ? 'Enviando...' : 'Enviar resultados'}</Button>}</div></header>
-    {error && <p className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700">{error}</p>}
-        {accessCode && <p className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">Código de acceso (muéstralo o imprímelo ahora; no volverá a mostrarse): <strong className="font-mono">{order.folio} / {accessCode}</strong></p>}
-    <div className="grid gap-4 lg:grid-cols-3"><div className="space-y-4 lg:col-span-2">
-      <Card><CardHeader><CardTitle>Estudio y especificaciones</CardTitle></CardHeader><CardContent className="space-y-1 text-sm"><p><span className="font-medium">Clínica:</span> {order.clinic?.name ?? '—'}</p><StudyDetailsSummary type={order.type} details={details} /></CardContent></Card>
-      <Card><CardHeader><CardTitle>Doctor solicitante</CardTitle></CardHeader><CardContent className="space-y-1 text-sm">{doctor ? <><p>{[doctor.firstName, doctor.paternalLastName, doctor.maternalLastName].filter(Boolean).join(' ')}</p><p>{doctor.email}</p>{doctor.specialty && <p><span className="font-medium">Especialidad:</span> {doctor.specialty}</p>}{doctor.professionalLicense && <p><span className="font-medium">Cédula profesional:</span> {doctor.professionalLicense}</p>}{doctor.clinicName && <p><span className="font-medium">Clínica:</span> {doctor.clinicName}</p>}{doctor.phone && <p><span className="font-medium">Teléfono:</span> {doctor.phone}</p>}</> : <p>—</p>}</CardContent></Card>
-      <Card><CardHeader><CardTitle>Paciente</CardTitle></CardHeader><CardContent className="space-y-1 text-sm">{patient ? <><p>{[patient.firstName, patient.paternalLastName, patient.maternalLastName].filter(Boolean).join(' ')}</p>{patient.birthDate && <p><span className="font-medium">Fecha de nacimiento:</span> {new Date(patient.birthDate).toLocaleDateString('es-MX')}</p>}{patient.sex && <p><span className="font-medium">Sexo:</span> {SEX_LABELS[patient.sex] ?? patient.sex}</p>}{patient.phone && <p><span className="font-medium">Teléfono:</span> {patient.phone}</p>}{patient.email && <p>{patient.email}</p>}</> : <p>—</p>}</CardContent></Card>
-      {canAttachResult && <Card><CardHeader><CardTitle>Finalizar y adjuntar resultados</CardTitle></CardHeader><CardContent><form className="space-y-4" onSubmit={uploadResult}><textarea required name="observations" className="min-h-24 w-full rounded border p-2 text-sm" placeholder="Observaciones" /><label className="block text-sm">Fecha realizada<input required name="realizedAt" type="date" className="ml-2 rounded border p-2" /></label><label className="block text-sm">Archivos JPG o DICOM (máximo 10; 500 MB por archivo; 500 MB total)<input required name="files" type="file" accept="image/jpeg,.jpg,.jpeg,.dcm,.dicom,application/dicom" multiple className="mt-1 block" /></label><Button disabled={submitting}>{submitting ? 'Guardando...' : 'Finalizar resultado'}</Button></form></CardContent></Card>}
-      {result && <Card><CardHeader><CardTitle>Resultado finalizado</CardTitle></CardHeader><CardContent><p className="whitespace-pre-wrap text-sm">{result.observations || 'Sin observaciones.'}</p><p className="mt-2 text-xs text-zinc-500">Realizado: {result.realizedAt ? new Date(result.realizedAt).toLocaleDateString('es-MX') : '—'}</p>{hasViewerAssets && <Button className="mt-3" size="sm" onClick={() => router.push(viewerPath)}>Abrir visor</Button>}</CardContent></Card>}
-      {!!order.assets?.length && <Card><CardHeader><CardTitle>Archivos adjuntos</CardTitle></CardHeader><CardContent><ul className="space-y-2">{order.assets.map((asset) => <li key={asset.id} className="rounded border p-2 text-sm">{asset.name} <Badge variant="outline">{asset.type}</Badge></li>)}</ul></CardContent></Card>}
-    </div><Card><CardHeader><CardTitle>Actividad</CardTitle></CardHeader><CardContent><ol className="space-y-3">{[...(order.events ?? [])].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map((event) => <li key={event.id} className="text-sm"><p>{EVENT_LABELS[event.type] ?? event.type}</p><p className="text-xs text-zinc-500">{new Date(event.createdAt).toLocaleString('es-MX')}</p></li>)}</ol></CardContent></Card></div>
+  const patient = order.patientHistory?.patient; const doctor = order.doctorClient; const result = order.results?.[0]; const hasViewerAssets = order.assets?.some((asset) => asset.type === 'dicom' || asset.type === 'image'); const canAttachResult = !result && !['delivered', 'cancelled'].includes(order.status); const nextAction = order.status === 'received' ? 'Agenda el estudio' : order.status === 'ready' ? 'Entrega los resultados' : canAttachResult ? 'Adjunta y finaliza los resultados' : null
+  return <div className="mx-auto flex w-full max-w-7xl flex-col gap-5 py-4 sm:py-6">
+    <header className="rounded-xl border bg-card p-4 sm:p-5"><div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"><div className="min-w-0"><Button variant="ghost" size="sm" className="-ml-2" onClick={() => router.push(ordersPath)}><ArrowLeft />Órdenes</Button><div className="mt-3 flex flex-wrap items-center gap-2"><h1 className="font-mono text-lg font-semibold text-primary">{order.folio}</h1><Badge variant="outline">{STATUS_LABELS[order.status] ?? order.status}</Badge></div><p className="mt-2 text-sm text-muted-foreground">Creada {dateTime(order.createdAt)} · Actualizada {dateTime(order.updatedAt)}</p></div><div className="flex flex-col gap-2 sm:items-end">{nextAction && <p className="text-sm font-medium">Siguiente paso: {nextAction}</p>}{order.status === 'received' && <div className="flex flex-wrap gap-2"><label className="sr-only" htmlFor="study-slot">Fecha y hora del estudio</label><input id="study-slot" className="h-8 rounded-md border bg-background px-2 text-sm" type="datetime-local" value={slot} onChange={(event) => setSlot(event.target.value)} /><Button size="sm" disabled={submitting || !slot} onClick={scheduleStudy}>Agendar estudio</Button></div>}{order.status === 'ready' && <Button size="sm" disabled={submitting} onClick={deliver}><Send />{submitting ? 'Enviando…' : 'Enviar resultados'}</Button>}{['received', 'scheduled', 'in_progress'].includes(order.status) && <AlertDialog><AlertDialogTrigger asChild><Button size="sm" variant="destructive" disabled={submitting}>Cancelar orden</Button></AlertDialogTrigger><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>¿Cancelar esta orden?</AlertDialogTitle><AlertDialogDescription>La orden {order.folio} dejará de estar disponible para el flujo de resultados.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel disabled={submitting}>Volver</AlertDialogCancel><AlertDialogAction variant="destructive" disabled={submitting} onClick={() => void cancel()}>Sí, cancelar</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>}</div></div></header>
+    {error && <p className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive" role="alert">{error}</p>}{accessCode && <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-foreground">Código de acceso (muéstralo o imprímelo ahora; no volverá a mostrarse): <strong className="font-mono">{order.folio} / {accessCode}</strong></p>}
+    <div className="grid gap-4 lg:grid-cols-3"><div className="space-y-4 lg:col-span-2"><Card><CardHeader><CardTitle>Estudio y especificaciones</CardTitle><CardDescription>{order.clinic?.name ?? 'Clínica no disponible'}</CardDescription></CardHeader><CardContent><StudyDetailsSummary type={order.type} details={order.details} /></CardContent></Card>{canAttachResult && <Card><CardHeader><CardTitle>Finalizar y adjuntar resultados</CardTitle><CardDescription>Al guardar, la orden queda lista para entrega.</CardDescription></CardHeader><CardContent><form className="grid gap-4" onSubmit={uploadResult}><div className="grid gap-2"><label className="text-sm font-medium" htmlFor="result-observations">Observaciones</label><textarea id="result-observations" required name="observations" className="min-h-24 rounded-md border bg-background p-2 text-sm" /></div><div className="grid gap-4 sm:grid-cols-2"><div className="grid gap-2"><label className="text-sm font-medium" htmlFor="result-realized-at">Fecha realizada</label><input id="result-realized-at" required name="realizedAt" type="date" className="h-9 rounded-md border bg-background px-2 text-sm" /></div><div className="grid gap-2"><label className="text-sm font-medium" htmlFor="result-files">Archivos</label><input id="result-files" required name="files" type="file" accept="image/jpeg,.jpg,.jpeg,.dcm,.dicom,application/dicom" multiple className="block text-sm" aria-describedby="result-files-help" /><p id="result-files-help" className="text-xs text-muted-foreground">JPG o DICOM; máximo 10 archivos, 500 MB por archivo y en total.</p></div></div><Button className="w-fit" disabled={submitting}>{submitting ? 'Guardando…' : 'Finalizar resultado'}</Button></form></CardContent></Card>}{result && <Card><CardHeader><CardTitle>Resultado finalizado</CardTitle></CardHeader><CardContent><p className="whitespace-pre-wrap text-sm">{result.observations || 'Sin observaciones.'}</p><p className="mt-3 text-xs text-muted-foreground">Realizado: {dateTime(result.realizedAt)}</p>{hasViewerAssets && <Button className="mt-3" size="sm" onClick={() => router.push(viewerPath)}>Abrir visor</Button>}</CardContent></Card>}{!!order.assets?.length && <Card><CardHeader><CardTitle>Archivos adjuntos</CardTitle></CardHeader><CardContent><ul className="grid gap-2 sm:grid-cols-2">{order.assets.map((asset) => <li key={asset.id} className="flex min-w-0 items-center justify-between gap-2 rounded-md border p-2 text-sm"><span className="truncate">{asset.name}</span><Badge variant="outline">{asset.type}</Badge></li>)}</ul></CardContent></Card>}</div><aside className="space-y-4"><Card><CardHeader><CardTitle>Paciente</CardTitle></CardHeader><CardContent className="space-y-2 text-sm">{patient ? <><p className="font-medium">{personName(patient)}</p>{patient.birthDate && <p><span className="text-muted-foreground">Nacimiento:</span> {dateTime(patient.birthDate)}</p>}{patient.sex && <p><span className="text-muted-foreground">Sexo:</span> {SEX_LABELS[patient.sex] ?? patient.sex}</p>}{patient.phone && <p>{patient.phone}</p>}{patient.email && <p className="break-all">{patient.email}</p>}</> : <p className="text-muted-foreground">Sin datos del paciente.</p>}</CardContent></Card><Card><CardHeader><CardTitle>{doctor ? 'Doctor solicitante' : 'Autorreferido'}</CardTitle></CardHeader><CardContent className="space-y-2 text-sm">{doctor ? <><p className="font-medium">{personName(doctor)}</p>{doctor.specialty && <p>{doctor.specialty}</p>}{doctor.professionalLicense && <p><span className="text-muted-foreground">Cédula:</span> {doctor.professionalLicense}</p>}{doctor.phone && <p>{doctor.phone}</p>}{doctor.email && <p className="break-all">{doctor.email}</p>}</> : <p className="text-muted-foreground">Sin profesional solicitante.</p>}</CardContent></Card></aside></div>
+    <Card><CardHeader><CardTitle>Actividad</CardTitle></CardHeader><CardContent>{order.events?.length ? <ol className="divide-y">{[...order.events].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map((event) => { const actor = event.user as { name?: string | null; email?: string | null } | null; return <li key={event.id} className="py-3 text-sm"><p className="font-medium">{EVENT_LABELS[event.type] ?? event.type}</p><p className="text-xs text-muted-foreground">{dateTime(event.createdAt)}{actor && ` · ${actor.name ?? actor.email ?? 'Usuario'}`}</p></li> })}</ol> : <p className="py-3 text-sm text-muted-foreground">Aún no hay actividad registrada.</p>}</CardContent></Card>
   </div>
 }
