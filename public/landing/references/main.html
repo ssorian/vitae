@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+
+<html class="scroll-smooth" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Vitae Premium Dental</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Fira+Sans:wght@400;500;600&amp;family=Raleway:wght@500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "outline": "#8a7076",
+                        "error": "#ba1a1a",
+                        "on-error": "#ffffff",
+                        "inverse-surface": "#332f32",
+                        "on-secondary-container": "#6a0031",
+                        "on-background": "#1d1b1e",
+                        "on-tertiary-fixed": "#22191e",
+                        "background": "#fff7fb",
+                        "inverse-primary": "#ffb1c5",
+                        "on-primary-fixed": "#3f001b",
+                        "primary-fixed-dim": "#ffb1c5",
+                        "tertiary-container": "#7e7177",
+                        "on-secondary-fixed-variant": "#8d0644",
+                        "error-container": "#ffdad6",
+                        "surface-container": "#f3ecf0",
+                        "tertiary-fixed-dim": "#d2c2c9",
+                        "primary-container": "#cc3f73",
+                        "on-primary-container": "#fffbff",
+                        "secondary": "#ae285c",
+                        "surface-variant": "#e8e0e4",
+                        "tertiary": "#65595f",
+                        "on-secondary-fixed": "#3f001a",
+                        "on-error-container": "#93000a",
+                        "on-tertiary": "#ffffff",
+                        "surface-container-low": "#f9f2f6",
+                        "on-surface": "#1d1b1e",
+                        "surface-bright": "#fff7fb",
+                        "secondary-fixed": "#ffd9e1",
+                        "on-primary-fixed-variant": "#8e0446",
+                        "tertiary-fixed": "#efdee5",
+                        "surface-container-highest": "#e8e0e4",
+                        "primary": "#ab245b",
+                        "on-tertiary-container": "#fffbff",
+                        "surface-container-lowest": "#ffffff",
+                        "secondary-container": "#fd6798",
+                        "secondary-fixed-dim": "#ffb1c4",
+                        "surface-container-high": "#ede6ea",
+                        "on-secondary": "#ffffff",
+                        "primary-fixed": "#ffd9e1",
+                        "surface-dim": "#dfd8dc",
+                        "surface": "#fff7fb",
+                        "on-surface-variant": "#574146",
+                        "on-primary": "#ffffff",
+                        "surface-tint": "#ae275d",
+                        "inverse-on-surface": "#f6eff3",
+                        "outline-variant": "#debfc5",
+                        "on-tertiary-fixed-variant": "#4f4449"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "section-gap-desktop": "120px",
+                        "section-gap-mobile": "64px",
+                        "container-max-width": "1280px",
+                        "grid-margin": "32px",
+                        "grid-gutter": "24px",
+                        "base": "8px"
+                    },
+                    "fontFamily": {
+                        "display-lg-mobile": ["Raleway"],
+                        "display-lg": ["Raleway"],
+                        "headline-md": ["Raleway"],
+                        "headline-sm": ["Raleway"],
+                        "body-md": ["Fira Sans"],
+                        "headline-lg": ["Raleway"],
+                        "body-lg": ["Fira Sans"],
+                        "label-sm": ["Fira Sans"],
+                        "label-md": ["Fira Sans"]
+                    },
+                    "fontSize": {
+                        "display-lg-mobile": ["40px", { "lineHeight": "48px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "display-lg": ["64px", { "lineHeight": "72px", "letterSpacing": "-0.02em", "fontWeight": "500" }],
+                        "headline-md": ["32px", { "lineHeight": "40px", "fontWeight": "600" }],
+                        "headline-sm": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "headline-lg": ["48px", { "lineHeight": "56px", "fontWeight": "500" }],
+                        "body-lg": ["18px", { "lineHeight": "28px", "fontWeight": "400" }],
+                        "label-sm": ["12px", { "lineHeight": "16px", "fontWeight": "600" }],
+                        "label-md": ["14px", { "lineHeight": "20px", "letterSpacing": "0.02em", "fontWeight": "500" }]
+                    },
+                    "boxShadow": {
+                        "premium": "0px 12px 40px rgba(36, 33, 36, 0.06)"
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .fade-slide-up {
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+        }
+        .fade-slide-up.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface font-body-md overflow-x-hidden selection:bg-primary-container selection:text-on-primary-container">
+<!-- TopNavBar (JSON Generated) -->
+<header class="bg-surface/90 backdrop-blur-md dark:bg-surface-dim/90 fixed top-0 w-full z-50 border-b border-outline-variant/30 shadow-sm transition-all duration-300">
+<div class="flex justify-between items-center h-20 px-grid-margin max-w-container-max-width mx-auto">
+<div class="font-display-lg text-headline-sm tracking-tight text-on-surface dark:text-on-surface-variant">
+                Vitae
+            </div>
+<nav class="hidden md:flex gap-8">
+<a class="text-on-surface-variant dark:text-on-surface hover:text-primary font-body-md text-body-md font-medium transition-colors" href="#services">Services</a>
+<a class="text-on-surface-variant dark:text-on-surface hover:text-primary font-body-md text-body-md font-medium transition-colors" href="#specialists">Specialists</a>
+<a class="text-on-surface-variant dark:text-on-surface hover:text-primary font-body-md text-body-md font-medium transition-colors" href="#locations">Locations</a>
+<a class="text-on-surface-variant dark:text-on-surface hover:text-primary font-body-md text-body-md font-medium transition-colors" href="#testimonials">Testimonials</a>
+</nav>
+<button class="bg-primary text-on-primary px-6 py-3 rounded-full font-label-md text-label-md hover:bg-primary-container transition-colors shadow-premium hover:-translate-y-0.5 duration-300">
+                Book Appointment
+            </button>
+</div>
+</header>
+<main class="pt-20">
+<!-- Hero Section -->
+<section class="h-[921px] min-h-[600px] flex items-center relative overflow-hidden bg-surface-container-lowest">
+<div class="absolute inset-0 z-0">
+<img class="w-full h-full object-cover opacity-80 mix-blend-multiply" data-alt="A sophisticated, high-key macro photograph of a serene dental clinic waiting area or patient room. The setting is luxurious and minimalist, featuring soft natural light pouring through large windows, highlighting pristine white surfaces and subtle touches of organic wood and soft pink floral accents. The mood is calm, clean, and premium, evoking a high-end wellness spa rather than a traditional medical office." src="https://lh3.googleusercontent.com/aida-public/AB6AXuD1jej_x8XHso_gtUeIQlrqaOZXwVfiZHGI-92ZNqxYo35BtpzcEje0SLgNaSnj00AbkYvB86OrQbS99Cg96IL-YJExPizHGWqeCkYZbfEnPlMcSe1WQLrtlm_RIzhCLSxNTqFFKERQhoSsK2XHXl6YrE-MgWJjEpk8gwgl_FVx3DLwX8-oN1acgUkTN7bv1tgWBhU85iGNHu_mtXk-oSc2-eyF2rJ1K1YmcUoqhuMZg8m4SYJ5yQeF7A"/>
+<div class="absolute inset-0 bg-gradient-to-r from-surface via-surface/80 to-transparent"></div>
+</div>
+<div class="max-w-container-max-width mx-auto px-grid-margin relative z-10 w-full">
+<div class="max-w-2xl fade-slide-up">
+<span class="inline-flex items-center gap-2 px-3 py-1 bg-secondary-fixed text-on-secondary-fixed rounded-full font-label-sm text-label-sm mb-6">
+<span class="material-symbols-outlined text-[16px]" style="font-variation-settings: 'FILL' 1;">star</span>
+                        4.9 on Google
+                    </span>
+<h1 class="font-display-lg text-display-lg-mobile md:text-display-lg text-on-surface mb-6 text-balance">
+                        Tu sonrisa merece una atención excepcional.
+                    </h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant mb-10 max-w-lg">
+                        Combining advanced clinical technology with an elevated, serene environment designed for your comfort and wellness.
+                    </p>
+<div class="flex gap-4">
+<button class="bg-primary text-on-primary px-8 py-4 rounded-full font-label-md text-label-md hover:bg-primary-container transition-colors shadow-premium hover:-translate-y-1 duration-300">
+                            Book Appointment
+                        </button>
+<button class="px-8 py-4 rounded-full font-label-md text-label-md border border-outline-variant text-on-surface hover:bg-surface-variant transition-colors">
+                            Explore Services
+                        </button>
+</div>
+</div>
+</div>
+</section>
+<!-- Spacer -->
+<div class="h-section-gap-mobile md:h-section-gap-desktop"></div>
+<!-- Final CTA -->
+<section class="bg-primary text-on-primary py-24 px-grid-margin relative overflow-hidden">
+<div class="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-white to-transparent"></div>
+<div class="max-w-3xl mx-auto text-center relative z-10 fade-slide-up">
+<h2 class="font-headline-lg text-headline-lg mb-6">Tu próxima sonrisa empieza aquí.</h2>
+<p class="font-body-lg text-body-lg mb-10 text-on-primary/80">Experience the Vitae difference. Schedule your comprehensive evaluation today.</p>
+<button class="bg-surface-container-lowest text-primary px-10 py-4 rounded-full font-label-md text-label-md hover:bg-surface transition-colors shadow-premium hover:-translate-y-1 duration-300">
+                    Book Your Appointment
+                </button>
+</div>
+</section>
+</main>
+<!-- Footer (JSON Generated) -->
+<footer class="bg-inverse-surface dark:bg-surface-container-lowest w-full py-16">
+<div class="grid grid-cols-1 md:grid-cols-4 gap-grid-gutter px-grid-margin max-w-container-max-width mx-auto">
+<div class="col-span-1 md:col-span-2">
+<div class="font-display-lg text-headline-sm text-surface-bright mb-6">
+                    Vitae
+                </div>
+<p class="font-body-md text-body-md text-surface-variant/70 mb-8 max-w-sm">
+                    Premium dental care elevating the standard of clinical excellence and patient experience.
+                </p>
+<div class="font-body-md text-body-md text-surface-variant/50">
+                    © 2024 Vitae Premium Dental. All rights reserved.
+                </div>
+</div>
+<div class="col-span-1">
+<h4 class="font-headline-sm text-label-md text-surface-bright mb-6 tracking-wider uppercase">Legal &amp; Patient</h4>
+<ul class="space-y-4">
+<li><a class="font-body-md text-body-md text-surface-variant/70 hover:text-surface-bright transition-colors" href="#">Privacy Policy</a></li>
+<li><a class="font-body-md text-body-md text-surface-variant/70 hover:text-surface-bright transition-colors" href="#">Terms of Service</a></li>
+<li><a class="font-body-md text-body-md text-surface-variant/70 hover:text-surface-bright transition-colors" href="#">Patient Portal</a></li>
+</ul>
+</div>
+<div class="col-span-1">
+<h4 class="font-headline-sm text-label-md text-surface-bright mb-6 tracking-wider uppercase">Connect</h4>
+<ul class="space-y-4">
+<li><a class="font-body-md text-body-md text-surface-variant/70 hover:text-surface-bright transition-colors" href="#">Careers</a></li>
+<li><a class="font-body-md text-body-md text-surface-variant/70 hover:text-surface-bright transition-colors" href="#">Emergency Care</a></li>
+</ul>
+</div>
+</div>
+</footer>
+<script>
+        // Simple Intersection Observer for fade-in animations
+        const observerOptions = {
+            root: null,
+            rootMargin: '0px',
+            threshold: 0.1
+        };
+
+        const observer = new IntersectionObserver((entries, observer) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, observerOptions);
+
+        document.querySelectorAll('.fade-slide-up').forEach((elem) => {
+            observer.observe(elem);
+        });
+        
+        // Trigger initial check for above-the-fold content
+        setTimeout(() => {
+            document.querySelectorAll('.fade-slide-up').forEach(el => {
+                const rect = el.getBoundingClientRect();
+                if(rect.top < window.innerHeight) {
+                    el.classList.add('visible');
+                }
+            });
+        }, 100);
+    </script>
+</body></html>

@@ -1,14 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { Box, CalendarDays, ClipboardList, FileText, Ruler, ScanLine } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Box, CalendarDays, Check, ChevronLeft, ChevronRight, ClipboardList, FileText, MapPin, Ruler, ScanLine } from 'lucide-react'
 
 import { createAuthenticatedPublicAppointmentAction, createAuthenticatedPublicStudyOrderAction, createExistingPublicAppointmentAction, createExistingPublicStudyOrderAction, createPublicAppointmentAction, createPublicStudyOrderAction, getPublicAvailabilityAction, listPublicBookingClinicsAction } from '#/modules/appointment/server/publicAppointment'
 import { defaultStudyDetails, StudyDetailsForm } from '#/modules/order/StudyDetailsForm'
 import { publicStudyTypes, studyDetailsSchemaByType } from '#/modules/order/schemas/studyCatalog'
 import { Button } from '#/shared/components/ui/button'
 import { Input } from '#/shared/components/ui/input'
-import { NativeSelect } from '#/shared/components/ui/native-select'
 import AppointmentWizardFrame from './AppointmentWizardFrame'
 
 type Clinic = { publicSlug: string; name: string }
@@ -17,101 +16,46 @@ type Service = 'general' | StudyType
 
 const labels: Record<StudyType, string> = { radiography: 'Radiografía', radiography_2d: 'Radiografía 2D', cbct: 'CBCT', cephalometric_analysis: 'Análisis cefalométrico', study_models: 'Modelos de estudio', intraoral_scan: 'Escaneo intraoral', orthodontic_package: 'Paquete ortodóncico', aligner_package: 'Paquete de alineadores', laboratory_order: 'Orden de laboratorio' }
 const icons: Record<Service, typeof CalendarDays> = { general: CalendarDays, radiography: ScanLine, radiography_2d: ScanLine, cbct: ScanLine, cephalometric_analysis: Ruler, study_models: Box, intraoral_scan: ScanLine, orthodontic_package: ClipboardList, aligner_package: ClipboardList, laboratory_order: FileText }
+const dateValue = (value: Date) => `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`
+const parseDate = (value: string) => new Date(`${value}T12:00:00`)
 
 export default function PatientAppointmentWizard({ existing, authenticated, onBack }: { existing: boolean; authenticated: boolean; onBack: () => void }) {
+  const today = useMemo(() => new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate()), [])
   const [clinics, setClinics] = useState<Clinic[]>([])
   const [clinicPublicSlug, setClinicPublicSlug] = useState('')
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
+  const [date, setDate] = useState(dateValue(today))
+  const [calendarMonth, setCalendarMonth] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1))
   const [slots, setSlots] = useState<{ startsAt: Date }[]>([])
   const [startsAt, setStartsAt] = useState('')
   const [service, setService] = useState<Service | null>(null)
-  const [firstName, setFirstName] = useState('')
-  const [paternalLastName, setPaternalLastName] = useState('')
-  const [maternalLastName, setMaternalLastName] = useState('')
-  const [phone, setPhone] = useState('')
-  const [email, setEmail] = useState('')
-  const [referring, setReferring] = useState(false)
-  const [doctor, setDoctor] = useState({ firstName: '', paternalLastName: '', email: '' })
-  const [details, setDetails] = useState(defaultStudyDetails('radiography'))
-  const [step, setStep] = useState(1)
-  const [message, setMessage] = useState('')
-  const [loading, setLoading] = useState(false)
-
+  const [firstName, setFirstName] = useState(''); const [paternalLastName, setPaternalLastName] = useState(''); const [maternalLastName, setMaternalLastName] = useState(''); const [phone, setPhone] = useState(''); const [email, setEmail] = useState('')
+  const [referring, setReferring] = useState(false); const [doctor, setDoctor] = useState({ firstName: '', paternalLastName: '', email: '' }); const [details, setDetails] = useState(defaultStudyDetails('radiography'))
+  const [step, setStep] = useState(1); const [message, setMessage] = useState(''); const [loading, setLoading] = useState(false)
   const studyType = service === 'general' || !service ? 'radiography' : service
   const isStudy = service !== 'general' && service !== null
-  const steps = authenticated ? ['Servicio', 'Detalles', 'Horario', 'Revisión', 'Confirmación'] : ['Identificación', 'Servicio', 'Detalles', 'Horario', 'Revisión', 'Confirmación']
-  const serviceStep = authenticated ? 1 : 2
-  const detailsStep = serviceStep + 1
-  const scheduleStep = detailsStep + 1
-  const reviewStep = scheduleStep + 1
+  const steps = authenticated ? ['Servicio', 'Detalles', 'Horario', 'Resumen'] : ['Identificación', 'Servicio', 'Detalles', 'Horario', 'Resumen']
+  const serviceStep = authenticated ? 1 : 2; const detailsStep = serviceStep + 1; const scheduleStep = detailsStep + 1; const reviewStep = scheduleStep + 1
+  const selectedClinic = clinics.find((clinic) => clinic.publicSlug === clinicPublicSlug)
+  const calendarDays = useMemo(() => {
+    const firstDay = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1)
+    const lastDay = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 0)
+    return Array.from({ length: firstDay.getDay() + lastDay.getDate() }, (_, index) => index < firstDay.getDay() ? null : new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), index - firstDay.getDay() + 1))
+  }, [calendarMonth])
 
-  useEffect(() => {
-    void listPublicBookingClinicsAction().then((items) => {
-      setClinics(items)
-      setClinicPublicSlug(items[0]?.publicSlug ?? '')
-    })
-  }, [])
-  useEffect(() => {
-    if (!clinicPublicSlug) return
-    void getPublicAvailabilityAction({ clinicPublicSlug, date }).then((result) => setSlots(result.success ? result.slots : []))
-  }, [clinicPublicSlug, date])
+  useEffect(() => { void listPublicBookingClinicsAction().then((items) => { setClinics(items); setClinicPublicSlug(items[0]?.publicSlug ?? '') }) }, [])
+  useEffect(() => { let active = true; if (!clinicPublicSlug) return () => { active = false }; void getPublicAvailabilityAction({ clinicPublicSlug, date }).then((result) => { if (active) setSlots(result.success ? result.slots : []) }); return () => { active = false } }, [clinicPublicSlug, date])
+  const chooseService = (nextService: Service) => { setService(nextService); if (nextService !== 'general') setDetails(defaultStudyDetails(nextService)); setStep(detailsStep) }
+  const valid = () => { if (!authenticated && step === 1) { if (!existing && (!firstName.trim() || !paternalLastName.trim() || !maternalLastName.trim())) return 'Ingresa tu nombre y apellidos.'; if (!phone.trim() && !email.trim()) return 'Ingresa teléfono o correo.'; if (email.trim() && !/^\S+@\S+\.\S+$/.test(email.trim())) return 'Ingresa un correo válido.' }; if (isStudy && step === detailsStep && !studyDetailsSchemaByType[studyType].safeParse(details).success) return 'Completa los detalles requeridos.'; if (isStudy && step === detailsStep && referring && (!doctor.firstName.trim() || !doctor.paternalLastName.trim() || !/^\S+@\S+\.\S+$/.test(doctor.email.trim()))) return 'Completa los datos del profesional remitente.'; if (step === scheduleStep && !startsAt) return 'Selecciona un horario.'; return '' }
+  const next = () => { const error = valid(); setMessage(error); if (!error) setStep((current) => current + 1) }
+  const submit = async () => { const error = valid(); if (error) return setMessage(error); setLoading(true); const base = { clinicPublicSlug, startsAt: new Date(startsAt) }; const patient = { ...base, firstName, paternalLastName, maternalLastName, phone: phone || undefined, email: email || undefined }; const study = { ...patient, type: studyType, details, doctor: referring ? doctor : undefined }; const result = isStudy ? authenticated ? await createAuthenticatedPublicStudyOrderAction({ ...base, type: studyType, details }) : existing ? await createExistingPublicStudyOrderAction(study) : await createPublicStudyOrderAction(study) : authenticated ? await createAuthenticatedPublicAppointmentAction(base) : existing ? await createExistingPublicAppointmentAction({ ...base, phone: phone || undefined, email: email || undefined }) : await createPublicAppointmentAction(patient); setLoading(false); if (result.success) { setMessage(isStudy ? 'La solicitud de estudio quedó registrada.' : 'La cita quedó registrada.'); setStep(reviewStep + 1) } else setMessage('No fue posible programar la solicitud.') }
+  const back = () => { if (step === detailsStep) { setService(null); setStep(serviceStep); return }; setStep((current) => current - 1) }
+  const identification = <div className="grid gap-5 sm:grid-cols-2">{!existing && <><label className="space-y-2 text-sm font-medium text-foreground">Nombre<Input required value={firstName} onChange={(event) => setFirstName(event.target.value)} /></label><label className="space-y-2 text-sm font-medium text-foreground">Apellido paterno<Input required value={paternalLastName} onChange={(event) => setPaternalLastName(event.target.value)} /></label><label className="space-y-2 text-sm font-medium text-foreground">Apellido materno<Input required value={maternalLastName} onChange={(event) => setMaternalLastName(event.target.value)} /></label></>}<label className="space-y-2 text-sm font-medium text-foreground">Teléfono<Input value={phone} onChange={(event) => setPhone(event.target.value)} /></label><label className="space-y-2 text-sm font-medium text-foreground">Correo<Input type="email" value={email} onChange={(event) => setEmail(event.target.value)} /></label></div>
+  const referrer = isStudy && <div className="space-y-3 rounded-md bg-secondary p-4"><label className="flex gap-2 text-sm text-foreground"><input type="checkbox" checked={referring} onChange={(event) => setReferring(event.target.checked)} />Me remite un profesional</label>{referring && <div className="grid gap-4 sm:grid-cols-3"><label className="space-y-2 text-sm">Nombre<Input value={doctor.firstName} onChange={(event) => setDoctor({ ...doctor, firstName: event.target.value })} /></label><label className="space-y-2 text-sm">Apellido paterno<Input value={doctor.paternalLastName} onChange={(event) => setDoctor({ ...doctor, paternalLastName: event.target.value })} /></label><label className="space-y-2 text-sm">Correo<Input type="email" value={doctor.email} onChange={(event) => setDoctor({ ...doctor, email: event.target.value })} /></label></div>}</div>
 
-  const chooseService = (nextService: Service) => {
-    setService(nextService)
-    if (nextService !== 'general') setDetails(defaultStudyDetails(nextService))
-    setStep(detailsStep)
-  }
-  const valid = () => {
-    if (!authenticated && step === 1) {
-      if (!existing && (!firstName.trim() || !paternalLastName.trim() || !maternalLastName.trim())) return 'Ingresa tu nombre y apellidos.'
-      if (!phone.trim() && !email.trim()) return 'Ingresa teléfono o correo.'
-      if (email.trim() && !/^\S+@\S+\.\S+$/.test(email.trim())) return 'Ingresa un correo válido.'
-    }
-    if (isStudy && step === detailsStep) {
-      if (!studyDetailsSchemaByType[studyType].safeParse(details).success) return 'Completa los detalles requeridos.'
-      if (referring && (!doctor.firstName.trim() || !doctor.paternalLastName.trim() || !/^\S+@\S+\.\S+$/.test(doctor.email.trim()))) return 'Completa los datos del profesional remitente.'
-    }
-    if (step === scheduleStep && !startsAt) return 'Selecciona un horario.'
-    return ''
-  }
-  const next = () => {
-    const error = valid()
-    setMessage(error)
-    if (!error) setStep((current) => current + 1)
-  }
-  const submit = async () => {
-    const error = valid()
-    if (error) return setMessage(error)
-    setLoading(true)
-    const base = { clinicPublicSlug, startsAt: new Date(startsAt) }
-    const patient = { ...base, firstName, paternalLastName, maternalLastName, phone: phone || undefined, email: email || undefined }
-    const study = { ...patient, type: studyType, details, doctor: referring ? doctor : undefined }
-    const result = isStudy ? authenticated ? await createAuthenticatedPublicStudyOrderAction({ ...base, type: studyType, details }) : existing ? await createExistingPublicStudyOrderAction(study) : await createPublicStudyOrderAction(study) : authenticated ? await createAuthenticatedPublicAppointmentAction(base) : existing ? await createExistingPublicAppointmentAction({ ...base, phone: phone || undefined, email: email || undefined }) : await createPublicAppointmentAction(patient)
-    setLoading(false)
-    if (result.success) {
-      setMessage('Solicitud programada.')
-      setStep(reviewStep + 1)
-    } else setMessage('No fue posible programar la solicitud.')
-  }
-  const back = () => {
-    if (step === detailsStep) {
-      setService(null)
-      setStep(serviceStep)
-      return
-    }
-    setStep((current) => current - 1)
-  }
+  if (!authenticated && step === 1) return <AppointmentWizardFrame title="Identifícate" subtitle={existing ? 'Ingresa un teléfono o correo para asociar tu solicitud.' : 'Ingresa tus datos para crear tu solicitud.'} steps={steps} currentStep={step} backLabel="Volver" onBack={onBack}><form className="space-y-6" onSubmit={(event) => { event.preventDefault(); next() }}>{identification}{message && <p className="text-sm text-destructive">{message}</p>}<Actions><Button>Siguiente</Button></Actions></form></AppointmentWizardFrame>
+  if (!service) return <AppointmentWizardFrame title="Elige tu servicio" subtitle="Selecciona la atención que necesitas agendar." steps={steps} currentStep={serviceStep} backLabel="Volver" onBack={onBack}><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{(['general', ...publicStudyTypes] as Service[]).map((type) => { const Icon = icons[type]; const label = type === 'general' ? 'Cita general' : labels[type]; const description = type === 'general' ? 'Agenda una consulta o atención clínica.' : 'Solicita este estudio en tu clínica.'; return <button key={type} type="button" onClick={() => chooseService(type)} className="group min-h-44 border border-border bg-background p-5 text-left transition duration-200 hover:-translate-y-0.5 hover:border-primary hover:bg-secondary active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4"><span className="flex size-11 items-center justify-center rounded-full bg-secondary text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground"><Icon aria-hidden="true" className="size-5" strokeWidth={1.6} /></span><strong className="mt-6 block font-[family-name:var(--font-raleway)] text-lg">{label}</strong><span className="mt-2 block text-sm leading-6 text-muted-foreground">{description}</span></button> })}</div></AppointmentWizardFrame>
 
-  const identification = <div className="grid gap-3 sm:grid-cols-2">{!existing && <><label>Nombre<Input required value={firstName} onChange={(event) => setFirstName(event.target.value)} /></label><label>Apellido paterno<Input required value={paternalLastName} onChange={(event) => setPaternalLastName(event.target.value)} /></label><label>Apellido materno<Input required value={maternalLastName} onChange={(event) => setMaternalLastName(event.target.value)} /></label></>}<label>Teléfono<Input value={phone} onChange={(event) => setPhone(event.target.value)} /></label><label>Correo<Input type="email" value={email} onChange={(event) => setEmail(event.target.value)} /></label></div>
-  const referrer = isStudy && <div className="space-y-2"><label className="flex gap-2"><input type="checkbox" checked={referring} onChange={(event) => setReferring(event.target.checked)} />Me remite un profesional</label>{referring && <div className="grid gap-3 sm:grid-cols-3"><label>Nombre<Input value={doctor.firstName} onChange={(event) => setDoctor({ ...doctor, firstName: event.target.value })} /></label><label>Apellido paterno<Input value={doctor.paternalLastName} onChange={(event) => setDoctor({ ...doctor, paternalLastName: event.target.value })} /></label><label>Correo<Input type="email" value={doctor.email} onChange={(event) => setDoctor({ ...doctor, email: event.target.value })} /></label></div>}</div>
-
-  if (!authenticated && step === 1) return <AppointmentWizardFrame title="Identifícate" subtitle={existing ? 'Ingresa un teléfono o correo para asociar tu solicitud.' : 'Ingresa tus datos para crear tu solicitud.'} steps={steps} currentStep={step} backLabel="Volver" onBack={onBack}><form className="space-y-4" onSubmit={(event) => { event.preventDefault(); next() }}>{identification}{message && <p className="text-sm text-red-600">{message}</p>}<div className="flex justify-end border-t pt-4"><Button>Siguiente</Button></div></form></AppointmentWizardFrame>
-  if (!service) return <AppointmentWizardFrame title="Elige tu servicio" subtitle="Selecciona la atención que necesitas agendar." steps={steps} currentStep={serviceStep} backLabel="Volver" onBack={onBack}><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{(['general', ...publicStudyTypes] as Service[]).map((type) => {
-    const Icon = icons[type]
-    const label = type === 'general' ? 'Cita general' : labels[type]
-    const description = type === 'general' ? 'Agenda una consulta o atención clínica.' : 'Solicita este estudio en tu clínica.'
-    return <button key={type} type="button" onClick={() => chooseService(type)} className="group min-h-48 rounded-2xl border border-pink-200 bg-white p-5 text-left shadow-[0_8px_24px_rgba(190,24,93,.06)] transition-[transform,border-color,box-shadow] duration-200 hover:-translate-y-0.5 hover:border-pink-400 hover:shadow-[0_12px_28px_rgba(190,24,93,.12)] active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-600 focus-visible:ring-offset-4"><span className="flex size-11 items-center justify-center rounded-full bg-pink-100 text-pink-700 transition-colors group-hover:bg-pink-600 group-hover:text-white"><Icon aria-hidden="true" className="size-5" strokeWidth={1.6} /></span><strong className="mt-6 block text-lg">{label}</strong><span className="mt-2 block text-sm leading-6 text-zinc-600">{description}</span></button>
-  })}</div></AppointmentWizardFrame>
-
-  return <AppointmentWizardFrame title={isStudy ? `Agenda tu ${labels[studyType]}` : 'Agenda tu cita'} subtitle="Completa los pasos para confirmar tu solicitud." steps={steps} currentStep={Math.min(step, steps.length)} backLabel="Elegir otro servicio" onBack={back}><form className="space-y-4" onSubmit={(event) => { event.preventDefault(); void submit() }}>{step > reviewStep ? <p>{message}</p> : <>{step === detailsStep && (isStudy ? <div className="space-y-4"><StudyDetailsForm type={studyType} value={details} onChange={setDetails} />{referrer}</div> : <div className="space-y-2 text-sm"><h2 className="text-lg font-semibold">Detalles de tu cita</h2><p className="text-zinc-600">La atención se definirá contigo durante la consulta. Continúa para elegir el horario que más te convenga.</p></div>)}{step === scheduleStep && <div className="space-y-3"><NativeSelect value={clinicPublicSlug} onChange={(event) => setClinicPublicSlug(event.target.value)}>{clinics.map((clinic) => <option key={clinic.publicSlug} value={clinic.publicSlug}>{clinic.name}</option>)}</NativeSelect><Input type="date" min={new Date().toISOString().slice(0, 10)} value={date} onChange={(event) => setDate(event.target.value)} /><div className="flex flex-wrap gap-2">{slots.map((slot) => { const value = new Date(slot.startsAt).toISOString(); return <Button key={value} type="button" variant={startsAt === value ? 'default' : 'outline'} onClick={() => setStartsAt(value)}>{new Date(slot.startsAt).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</Button> })}</div></div>}{step === reviewStep && <div className="space-y-2 text-sm"><p><strong>Clínica:</strong> {clinics.find((clinic) => clinic.publicSlug === clinicPublicSlug)?.name}</p><p><strong>Horario:</strong> {startsAt && new Date(startsAt).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' })}</p>{isStudy && <p><strong>Estudio:</strong> {labels[studyType]}</p>}</div>}{message && <p className="text-sm text-red-600">{message}</p>}<div className="flex justify-end border-t pt-4">{step < reviewStep ? <Button type="button" onClick={next}>Siguiente</Button> : <Button disabled={loading}>{loading ? 'Programando...' : 'Confirmar'}</Button>}</div></>}</form></AppointmentWizardFrame>
+  return <AppointmentWizardFrame title={step > reviewStep ? (isStudy ? 'Solicitud confirmada' : 'Cita confirmada') : isStudy ? `Agenda tu ${labels[studyType]}` : 'Agenda tu cita'} subtitle={step > reviewStep ? 'Recibimos tu información correctamente.' : 'Completa los pasos para confirmar tu solicitud.'} steps={steps} currentStep={Math.min(step, steps.length)} backLabel="Elegir otro servicio" onBack={back}><form className="space-y-6" onSubmit={(event) => { event.preventDefault(); void submit() }}>{step > reviewStep ? <div role="status" className="rise-in flex flex-col items-center py-10 text-center"><span className="flex size-28 items-center justify-center rounded-full bg-secondary text-primary motion-safe:animate-in motion-safe:zoom-in-50 motion-safe:duration-500"><Check aria-hidden="true" className="size-16" strokeWidth={2.5} /></span><h2 className="mt-6 font-[family-name:var(--font-raleway)] text-2xl font-semibold">{isStudy ? 'Solicitud enviada' : 'Cita concretada'}</h2><p className="mt-3 max-w-md text-muted-foreground">{message} Te esperamos en {selectedClinic?.name}.</p></div> : <>{step === detailsStep && (isStudy ? <div className="space-y-5"><StudyDetailsForm type={studyType} value={details} onChange={setDetails} />{referrer}</div> : <div className="space-y-2 text-sm"><h2 className="font-[family-name:var(--font-raleway)] text-xl font-semibold">Detalles de tu cita</h2><p className="leading-6 text-muted-foreground">La atención se definirá contigo durante la consulta. Continúa para elegir el horario que más te convenga.</p></div>)}{step === scheduleStep && <section aria-label="Selección de clínica, fecha y horario" className="space-y-6"><div className="border border-border bg-secondary p-5"><p className="text-xs font-semibold uppercase tracking-[.12em] text-muted-foreground">Clínica</p><label className="mt-3 block text-sm font-medium text-foreground">Elige la sede<select value={clinicPublicSlug} onChange={(event) => { setClinicPublicSlug(event.target.value); setStartsAt('') }} className="mt-2 block min-h-12 w-full border border-border bg-card px-3 text-foreground outline-none focus:border-ring focus:ring-2 focus:ring-ring/20">{clinics.map((clinic) => <option key={clinic.publicSlug} value={clinic.publicSlug}>{clinic.name}</option>)}</select></label>{selectedClinic && <p className="mt-3 flex items-center gap-2 text-sm text-muted-foreground"><MapPin aria-hidden="true" className="size-4 text-primary" />Disponibilidad para {selectedClinic.name}</p>}</div><div className="grid gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(15rem,.85fr)]"><section className="border border-border bg-card p-5"><div className="flex items-center justify-between"><button type="button" aria-label="Mes anterior" onClick={() => setCalendarMonth((month) => new Date(month.getFullYear(), month.getMonth() - 1, 1))} className="p-2 text-muted-foreground hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><ChevronLeft aria-hidden="true" className="size-5" /></button><h2 className="font-[family-name:var(--font-raleway)] text-lg font-semibold capitalize">{calendarMonth.toLocaleDateString('es-MX', { month: 'long', year: 'numeric' })}</h2><button type="button" aria-label="Mes siguiente" onClick={() => setCalendarMonth((month) => new Date(month.getFullYear(), month.getMonth() + 1, 1))} className="p-2 text-muted-foreground hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><ChevronRight aria-hidden="true" className="size-5" /></button></div><div className="mt-5 grid grid-cols-7 text-center text-xs font-semibold uppercase tracking-[.08em] text-muted-foreground">{['D', 'L', 'M', 'M', 'J', 'V', 'S'].map((day, index) => <span key={`${day}-${index}`}>{day}</span>)}</div><div className="mt-3 grid grid-cols-7 gap-1">{calendarDays.map((day, index) => day ? <button key={dateValue(day)} type="button" aria-label={day.toLocaleDateString('es-MX', { dateStyle: 'full' })} aria-pressed={date === dateValue(day)} disabled={day < today} onClick={() => { setDate(dateValue(day)); setCalendarMonth(new Date(day.getFullYear(), day.getMonth(), 1)); setStartsAt('') }} className={`aspect-square text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${date === dateValue(day) ? 'bg-primary text-primary-foreground' : 'text-foreground hover:bg-secondary'} disabled:cursor-not-allowed disabled:text-muted-foreground`}>{day.getDate()}</button> : <span key={`blank-${index}`} />)}</div><label className="sr-only" htmlFor="appointment-date">Elegir otra fecha</label><Input id="appointment-date" type="date" min={dateValue(today)} value={date} onChange={(event) => { setDate(event.target.value); setCalendarMonth(new Date(parseDate(event.target.value).getFullYear(), parseDate(event.target.value).getMonth(), 1)); setStartsAt('') }} className="mt-5" /></section><section aria-live="polite" className="border border-border bg-secondary p-5"><p className="text-xs font-semibold uppercase tracking-[.12em] text-muted-foreground">Horarios disponibles</p><h2 className="mt-2 font-[family-name:var(--font-raleway)] text-lg font-semibold">{parseDate(date).toLocaleDateString('es-MX', { day: 'numeric', month: 'long' })}</h2><div className="mt-5 grid grid-cols-2 gap-2">{slots.map((slot) => { const value = new Date(slot.startsAt).toISOString(); return <button key={value} type="button" aria-pressed={startsAt === value} onClick={() => setStartsAt(value)} className={`min-h-11 border px-3 text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${startsAt === value ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-card text-foreground hover:border-primary'}`}>{new Date(slot.startsAt).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</button> })}</div>{slots.length === 0 && <p className="mt-5 text-sm leading-6 text-muted-foreground">No hay horarios disponibles para esta fecha.</p>}</section></div></section>}{step === reviewStep && <div className="border border-border bg-secondary p-5 text-sm leading-7 text-muted-foreground"><p><strong className="text-foreground">Clínica:</strong> {selectedClinic?.name}</p><p><strong className="text-foreground">Horario:</strong> {startsAt && new Date(startsAt).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' })}</p>{isStudy && <p><strong className="text-foreground">Estudio:</strong> {labels[studyType]}</p>}</div>}{message && <p className="text-sm text-destructive">{message}</p>}<Actions>{step < reviewStep ? <Button type="button" onClick={next}>Siguiente</Button> : <Button disabled={loading}>{loading ? 'Finalizando...' : 'Finalizar'}</Button>}</Actions></>}</form></AppointmentWizardFrame>
 }
+
+function Actions({ children }: { children: React.ReactNode }) { return <div className="flex justify-end border-t border-border pt-5">{children}</div> }

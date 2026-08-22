@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+
+<html class="scroll-smooth" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Vitae - Book Appointment</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600&amp;family=Raleway:wght@500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-container-high": "#fae3e7",
+                        "error-container": "#ffdad6",
+                        "off-white": "#FCFAFB",
+                        "error": "#ba1a1a",
+                        "primary-fixed-dim": "#ffb1c5",
+                        "surface-container-highest": "#f4dde1",
+                        "on-tertiary-fixed": "#002204",
+                        "on-background": "#24181b",
+                        "on-tertiary-fixed-variant": "#005313",
+                        "surface-bright": "#fff8f8",
+                        "primary-fixed": "#ffd9e1",
+                        "outline": "#8a7076",
+                        "outline-variant": "#debfc5",
+                        "primary-container": "#cc3f73",
+                        "tertiary-fixed-dim": "#64df69",
+                        "surface-container-low": "#fff0f2",
+                        "surface-tint": "#ae275d",
+                        "surface": "#fff8f8",
+                        "on-secondary": "#ffffff",
+                        "tertiary": "#006b1c",
+                        "on-primary-fixed": "#3f001b",
+                        "on-tertiary-container": "#f7fff1",
+                        "on-primary-fixed-variant": "#8e0446",
+                        "tertiary-container": "#008725",
+                        "border-gray": "#EAE5E7",
+                        "surface-container": "#ffe8ec",
+                        "on-secondary-fixed": "#1d1b1e",
+                        "surface-container-lowest": "#ffffff",
+                        "inverse-primary": "#ffb1c5",
+                        "on-error": "#ffffff",
+                        "surface-dim": "#ebd5d8",
+                        "on-surface-variant": "#574146",
+                        "on-tertiary": "#ffffff",
+                        "on-secondary-container": "#686366",
+                        "secondary-fixed": "#e8e0e4",
+                        "inverse-surface": "#3b2d30",
+                        "secondary": "#615d60",
+                        "soft-pink": "#FCEBF2",
+                        "inverse-on-surface": "#ffecef",
+                        "background": "#fff8f8",
+                        "on-error-container": "#93000a",
+                        "on-secondary-fixed-variant": "#494649",
+                        "surface-variant": "#f4dde1",
+                        "primary": "#ab245b",
+                        "secondary-container": "#e8e0e4",
+                        "on-primary-container": "#fffbff",
+                        "secondary-fixed-dim": "#cbc5c8",
+                        "on-surface": "#24181b",
+                        "on-primary": "#ffffff",
+                        "tertiary-fixed": "#81fd83"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "margin-mobile": "24px",
+                        "section-gap-max": "144px",
+                        "margin-desktop": "48px",
+                        "gutter": "24px",
+                        "container-max": "1280px",
+                        "section-gap-min": "96px"
+                    },
+                    "fontFamily": {
+                        "label-md": ["Figtree"],
+                        "headline-lg": ["Raleway"],
+                        "headline-sm": ["Raleway"],
+                        "headline-md": ["Raleway"],
+                        "body-md": ["Figtree"],
+                        "display-lg-mobile": ["Raleway"],
+                        "display-lg": ["Raleway"],
+                        "label-sm": ["Figtree"],
+                        "body-lg": ["Figtree"]
+                    },
+                    "fontSize": {
+                        "label-md": ["14px", { "lineHeight": "20px", "letterSpacing": "0.02em", "fontWeight": "500" }],
+                        "headline-lg": ["48px", { "lineHeight": "56px", "fontWeight": "500" }],
+                        "headline-sm": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "headline-md": ["32px", { "lineHeight": "40px", "fontWeight": "600" }],
+                        "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "display-lg-mobile": ["40px", { "lineHeight": "48px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "display-lg": ["64px", { "lineHeight": "72px", "letterSpacing": "-0.02em", "fontWeight": "500" }],
+                        "label-sm": ["12px", { "lineHeight": "16px", "fontWeight": "600" }],
+                        "body-lg": ["18px", { "lineHeight": "28px", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background-color: #EAE5E7;
+            border-radius: 4px;
+        }
+        .glass-panel {
+            background: rgba(255, 248, 248, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid #EAE5E7;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-surface font-body-md antialiased selection:bg-soft-pink selection:text-primary">
+<!-- Suppressed Nav: This is a focused checkout/transactional flow -->
+<!-- Header Minimal -->
+<header class="fixed top-0 w-full z-50 bg-surface/80 backdrop-blur-md border-b border-border-gray">
+<div class="flex justify-between items-center px-margin-desktop max-w-container-max mx-auto h-20">
+<a class="font-headline-sm text-headline-sm font-bold text-on-surface" href="#">Vitae</a>
+<button class="text-on-surface-variant hover:text-primary transition-colors flex items-center gap-2 font-label-md text-label-md">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">close</span>
+                Cancel Booking
+            </button>
+</div>
+</header>
+<main class="pt-20 pb-section-gap-min min-h-screen flex flex-col md:flex-row max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop gap-gutter pt-[144px]">
+<!-- Left Column: Content Canvas (Step 3 & 4) -->
+<div class="w-full md:w-8/12 flex flex-col gap-12">
+<!-- Progress Indicator -->
+<div class="flex items-center gap-4 border-b border-border-gray pb-6">
+<div class="flex items-center gap-2 text-on-surface-variant">
+<span class="w-6 h-6 rounded-full bg-soft-pink text-primary flex items-center justify-center font-label-sm text-label-sm">1</span>
+<span class="font-label-md text-label-md">Service</span>
+</div>
+<div class="h-[1px] w-8 bg-border-gray"></div>
+<div class="flex items-center gap-2 text-on-surface-variant">
+<span class="w-6 h-6 rounded-full bg-soft-pink text-primary flex items-center justify-center font-label-sm text-label-sm">2</span>
+<span class="font-label-md text-label-md">Clinic</span>
+</div>
+<div class="h-[1px] w-8 bg-border-gray"></div>
+<div class="flex items-center gap-2 text-on-surface">
+<span class="w-6 h-6 rounded-full bg-primary text-on-primary flex items-center justify-center font-label-sm text-label-sm">3</span>
+<span class="font-label-md text-label-md font-semibold">Date &amp; Time</span>
+</div>
+<div class="h-[1px] w-8 bg-border-gray"></div>
+<div class="flex items-center gap-2 text-on-surface-variant">
+<span class="w-6 h-6 rounded-full border border-border-gray flex items-center justify-center font-label-sm text-label-sm">4</span>
+<span class="font-label-md text-label-md">Details</span>
+</div>
+</div>
+<!-- Step 3: Date & Time -->
+<section class="flex flex-col gap-8" id="step-3">
+<div>
+<h1 class="font-headline-md text-headline-md mb-2">Select a Date &amp; Time</h1>
+<p class="text-on-surface-variant font-body-lg text-body-lg">Choose a convenient slot for your consultation.</p>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+<!-- Calendar Picker -->
+<div class="glass-panel p-6 rounded-xl">
+<div class="flex justify-between items-center mb-6">
+<button class="p-2 hover:bg-soft-pink rounded-full transition-colors text-on-surface-variant hover:text-primary">
+<span class="material-symbols-outlined">chevron_left</span>
+</button>
+<h3 class="font-label-md text-label-md font-semibold">October 2024</h3>
+<button class="p-2 hover:bg-soft-pink rounded-full transition-colors text-on-surface-variant hover:text-primary">
+<span class="material-symbols-outlined">chevron_right</span>
+</button>
+</div>
+<div class="grid grid-cols-7 gap-2 text-center mb-2">
+<div class="font-label-sm text-label-sm text-on-surface-variant">S</div>
+<div class="font-label-sm text-label-sm text-on-surface-variant">M</div>
+<div class="font-label-sm text-label-sm text-on-surface-variant">T</div>
+<div class="font-label-sm text-label-sm text-on-surface-variant">W</div>
+<div class="font-label-sm text-label-sm text-on-surface-variant">T</div>
+<div class="font-label-sm text-label-sm text-on-surface-variant">F</div>
+<div class="font-label-sm text-label-sm text-on-surface-variant">S</div>
+</div>
+<div class="grid grid-cols-7 gap-2 text-center font-body-md text-body-md">
+<!-- Empty days -->
+<div></div><div></div>
+<!-- Days -->
+<button class="p-2 rounded-full text-on-surface-variant hover:bg-soft-pink hover:text-primary transition-colors">1</button>
+<button class="p-2 rounded-full text-on-surface-variant hover:bg-soft-pink hover:text-primary transition-colors">2</button>
+<button class="p-2 rounded-full text-on-surface-variant hover:bg-soft-pink hover:text-primary transition-colors">3</button>
+<button class="p-2 rounded-full text-on-surface-variant hover:bg-soft-pink hover:text-primary transition-colors">4</button>
+<button class="p-2 rounded-full text-on-surface-variant hover:bg-soft-pink hover:text-primary transition-colors">5</button>
+<button class="p-2 rounded-full text-on-surface-variant hover:bg-soft-pink hover:text-primary transition-colors">6</button>
+<button class="p-2 rounded-full text-on-surface-variant hover:bg-soft-pink hover:text-primary transition-colors">7</button>
+<button class="p-2 rounded-full text-on-surface-variant hover:bg-soft-pink hover:text-primary transition-colors">8</button>
+<button class="p-2 rounded-full text-on-surface-variant hover:bg-soft-pink hover:text-primary transition-colors">9</button>
+<button class="p-2 rounded-full text-on-surface-variant hover:bg-soft-pink hover:text-primary transition-colors">10</button>
+<button class="p-2 rounded-full text-on-surface-variant hover:bg-soft-pink hover:text-primary transition-colors">11</button>
+<button class="p-2 rounded-full text-on-surface-variant hover:bg-soft-pink hover:text-primary transition-colors">12</button>
+<button class="p-2 rounded-full text-on-surface-variant hover:bg-soft-pink hover:text-primary transition-colors">13</button>
+<button class="p-2 rounded-full bg-primary text-on-primary font-medium hover:opacity-90 transition-opacity">14</button>
+<button class="p-2 rounded-full text-on-surface-variant hover:bg-soft-pink hover:text-primary transition-colors">15</button>
+<button class="p-2 rounded-full text-on-surface-variant hover:bg-soft-pink hover:text-primary transition-colors">16</button>
+<button class="p-2 rounded-full text-on-surface-variant hover:bg-soft-pink hover:text-primary transition-colors">17</button>
+<button class="p-2 rounded-full text-on-surface-variant hover:bg-soft-pink hover:text-primary transition-colors">18</button>
+<button class="p-2 rounded-full text-on-surface-variant hover:bg-soft-pink hover:text-primary transition-colors">19</button>
+</div>
+</div>
+<!-- Time Slots -->
+<div class="glass-panel p-6 rounded-xl flex flex-col h-full">
+<h3 class="font-label-md text-label-md font-semibold mb-6">Available on Oct 14</h3>
+<div class="flex-1 overflow-y-auto custom-scrollbar pr-2 flex flex-col gap-3">
+<label class="cursor-pointer">
+<input class="peer sr-only" name="time_slot" type="radio" value="09:00"/>
+<div class="w-full text-center py-3 px-4 border border-border-gray rounded-lg hover:border-primary/50 transition-colors peer-checked:border-primary peer-checked:bg-soft-pink peer-checked:text-primary font-label-md text-label-md text-on-surface">
+                                    09:00 AM
+                                </div>
+</label>
+<label class="cursor-pointer">
+<input checked="" class="peer sr-only" name="time_slot" type="radio" value="10:00"/>
+<div class="w-full text-center py-3 px-4 border border-border-gray rounded-lg hover:border-primary/50 transition-colors peer-checked:border-primary peer-checked:bg-soft-pink peer-checked:text-primary font-label-md text-label-md text-on-surface">
+                                    10:00 AM
+                                </div>
+</label>
+<label class="cursor-pointer">
+<input class="peer sr-only" name="time_slot" type="radio" value="11:30"/>
+<div class="w-full text-center py-3 px-4 border border-border-gray rounded-lg hover:border-primary/50 transition-colors peer-checked:border-primary peer-checked:bg-soft-pink peer-checked:text-primary font-label-md text-label-md text-on-surface">
+                                    11:30 AM
+                                </div>
+</label>
+<label class="cursor-pointer">
+<input class="peer sr-only" name="time_slot" type="radio" value="14:00"/>
+<div class="w-full text-center py-3 px-4 border border-border-gray rounded-lg hover:border-primary/50 transition-colors peer-checked:border-primary peer-checked:bg-soft-pink peer-checked:text-primary font-label-md text-label-md text-on-surface">
+                                    02:00 PM
+                                </div>
+</label>
+</div>
+<button class="mt-6 w-full py-4 bg-primary text-on-primary font-label-md text-label-md rounded-lg hover:opacity-90 transition-opacity flex items-center justify-center gap-2">
+                            Continue to Details
+                            <span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+</button>
+</div>
+</div>
+</section>
+</div>
+<!-- Right Column: Summary Sidebar -->
+<aside class="w-full md:w-4/12 h-fit sticky top-[120px]">
+<div class="glass-panel p-8 rounded-2xl flex flex-col gap-8 shadow-[0_8px_30px_rgb(36,24,27,0.04)]">
+<h2 class="font-headline-sm text-headline-sm border-b border-border-gray pb-4">Booking Summary</h2>
+<div class="flex flex-col gap-6">
+<!-- Service -->
+<div class="flex items-start gap-4">
+<div class="w-10 h-10 rounded-full bg-soft-pink text-primary flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">dentistry</span>
+</div>
+<div>
+<p class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider mb-1">Service</p>
+<p class="font-body-md text-body-md text-on-surface font-medium">Initial Consultation &amp; Assessment</p>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1">45 min</p>
+</div>
+</div>
+<!-- Location -->
+<div class="flex items-start gap-4">
+<div class="w-10 h-10 rounded-full bg-soft-pink text-primary flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">location_on</span>
+</div>
+<div>
+<p class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider mb-1">Clinic</p>
+<p class="font-body-md text-body-md text-on-surface font-medium">Vitae Central</p>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1">124 Wellness Blvd, Suite 200</p>
+</div>
+</div>
+<!-- Date/Time Preview -->
+<div class="flex items-start gap-4 p-4 bg-off-white rounded-lg border border-border-gray">
+<div class="w-10 h-10 rounded-full bg-white text-on-surface flex items-center justify-center shrink-0 shadow-sm">
+<span class="material-symbols-outlined">calendar_today</span>
+</div>
+<div>
+<p class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider mb-1">Date &amp; Time</p>
+<p class="font-body-md text-body-md text-on-surface font-medium">Oct 14, 2024</p>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1">10:00 AM</p>
+</div>
+</div>
+</div>
+</div>
+</aside>
+</main>
+<!-- Suppressed Footer: Transactional Flow -->
+</body></html>

@@ -1,5 +1,4 @@
 
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Manrope:wght@400;500;600;700;800&display=swap');
 @import 'tailwindcss';
 @plugin '@tailwindcss/typography';
 
@@ -15,10 +14,13 @@
    * Rosa, gris y blanco
    */
 
-  --brand-pink: #d40683;
-  --brand-pink-deep: #a90068;
-  --brand-pink-soft: #f2a0cc;
-  --brand-pink-pale: #fce8f3;
+  --font-figtree: 'Figtree Variable', sans-serif;
+  --font-raleway: 'Raleway Variable', sans-serif;
+
+  --brand-pink: #e9568a;
+  --brand-pink-deep: #c93e70;
+  --brand-pink-soft: #f4aac5;
+  --brand-pink-pale: #fcebf2;
   --clinical-gray: #f1f3f2;
   --clinical-gray-line: #dce1df;
 
@@ -268,8 +270,8 @@
 }
 
 @theme inline {
-  --font-sans: var(--font-sans);
-  --font-heading: var(--font-sans);
+  --font-sans: var(--font-figtree);
+  --font-heading: var(--font-raleway);
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -494,7 +496,7 @@ pre code {
 }
 
 .display-title {
-  font-family: 'Fraunces', Georgia, serif;
+  font-family: var(--font-raleway);
 }
 
 .island-shell {

@@ -28,11 +28,11 @@ export type DashboardSidebarProps = {
 }
 
 const menuButtonClassName = `
-  text-white
-  hover:bg-white/15
-  hover:text-white
-  data-[active=true]:bg-[var(--brand-pink-deep)]
-  data-[active=true]:text-white
+  text-sidebar-foreground
+  hover:bg-sidebar-accent
+  hover:text-sidebar-accent-foreground
+  data-[active=true]:bg-sidebar-accent
+  data-[active=true]:text-sidebar-accent-foreground
   data-[active=true]:font-semibold
 `
 
@@ -40,26 +40,14 @@ export function DashboardSidebar({
   items,
 }: DashboardSidebarProps) {
   return (
-    <Sidebar
-      collapsible="offcanvas"
-      className="
-        [--sidebar:var(--brand-pink)]
-        [--sidebar-foreground:white]
-        [--sidebar-primary:white]
-        [--sidebar-primary-foreground:var(--brand-pink)]
-        [--sidebar-accent:var(--brand-pink-deep)]
-        [--sidebar-accent-foreground:white]
-        [--sidebar-border:rgba(255,255,255,0.16)]
-        [--sidebar-ring:white]
-      "
-    >
-      <SidebarHeader className="border-b border-white/15">
+    <Sidebar collapsible="offcanvas">
+      <SidebarHeader className="border-b border-sidebar-border">
         <div className="flex items-center gap-2 px-2 py-2">
-          <div className="flex size-8 items-center justify-center rounded-lg bg-white">
+          <div className="flex size-8 items-center justify-center rounded-lg bg-sidebar-primary">
             <Image src="/image.svg" alt="" width={24} height={24} />
           </div>
 
-          <span className="font-semibold text-white">
+          <span className="font-semibold text-sidebar-foreground">
             Vitae
           </span>
         </div>
@@ -67,7 +55,7 @@ export function DashboardSidebar({
 
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel className="text-white/60">
+          <SidebarGroupLabel className="text-sidebar-foreground/60">
             Navegación
           </SidebarGroupLabel>
 
@@ -85,8 +73,8 @@ export function DashboardSidebar({
                       className={menuButtonClassName}
                     >
                       <Link href={item.to}>
-                        <Icon className="text-white" />
-                        <span className="text-white">
+                        <Icon />
+                        <span>
                           {item.title}
                         </span>
                       </Link>

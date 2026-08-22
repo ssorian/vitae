@@ -3,12 +3,8 @@ import type { Metadata } from 'next'
 import '#/shared/styles.css'
 
 import { Providers } from './providers'
-import { Geist } from "next/font/google";
-import { cn } from "#/shared/lib/utils";
 
 import '@fontsource-variable/raleway/wght.css'
-
-const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 export const metadata: Metadata = {
   title: 'Vitae',
@@ -21,7 +17,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="es" className={cn("font-sans", geist.variable)}>
+    <html lang="es" className="font-sans">
       <body>
         <Providers>{children}</Providers>
       </body>
