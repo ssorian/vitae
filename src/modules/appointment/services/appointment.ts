@@ -15,12 +15,14 @@ import { sendAppointmentConfirmation } from './appointmentConfirmation'
 const terminal = ['completed', 'cancelled', 'rejected', 'no_show'] as const
 export const SLOT_NOT_AVAILABLE = 'SLOT_NOT_AVAILABLE'
 type SlotInput = { clinicId: string; startsAt: Date; endsAt: Date }
+type TimeRange = Pick<SlotInput, 'startsAt' | 'endsAt'>
 
 function parts(date: Date, timezone: string) {
   const values = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23', weekday: 'short' }).formatToParts(date)
   return Object.fromEntries(values.filter((p) => p.type !== 'literal').map((p) => [p.type, p.value])) as Record<string, string>
 }
 function overlaps(a: Date, b: Date, c: Date, d: Date) { return a < d && c < b }
+export function slotsWithoutConflicts<T extends TimeRange>(candidates: T[], scheduled: TimeRange[]) { return candidates.filter((slot) => !scheduled.some((current) => overlaps(current.startsAt, current.endsAt, slot.startsAt, slot.endsAt))) }
 function localDay(date: Date, timezone: string) { const p = parts(date, timezone); return `${p.year}-${p.month}-${p.day}` }
 function weekday(date: Date, timezone: string) { return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(parts(date, timezone).weekday) }
 function localTime(date: Date, timezone: string) { const p = parts(date, timezone); return `${p.hour}:${p.minute}` }
@@ -84,7 +86,19 @@ export async function listPublicClinics() { return db.select({ publicSlug: clini
 async function publicClinic(tx: any, publicSlug: string) { const [current] = await tx.select().from(clinic).where(and(eq(clinic.publicSlug, publicSlug), eq(clinic.status, 'active'), isNull(clinic.archivedAt))); if (!current) throw new Error('BOOKING_UNAVAILABLE'); return current }
 function publicRange(date: string, timezone: string, interval: number) { const start = new Date(`${date}T00:00:00Z`); return Array.from({ length: Math.ceil((52 * 60) / interval) }, (_, index) => new Date(start.getTime() - 14 * 3600000 + index * interval * 60000)).filter((value) => localDay(value, timezone) === date) }
 
-export async function getPublicAvailableSlots(input: { clinicPublicSlug: string; date: string }) { const currentClinic = await publicClinic(db, input.clinicPublicSlug); const now = new Date(); const latest = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); const result: { startsAt: Date; endsAt: Date }[] = []; for (const startsAt of publicRange(input.date, currentClinic.timezone, currentClinic.slotIntervalMinutes)) { const endsAt = new Date(startsAt.getTime() + 30 * 60 * 1000); if (startsAt <= now || startsAt > latest || localDay(endsAt, currentClinic.timezone) !== input.date) continue; try { await slotIsAvailable(db, currentClinic.organizationId, { clinicId: currentClinic.id, startsAt, endsAt }, undefined, true); result.push({ startsAt, endsAt }) } catch (error) { if (!(error instanceof Error) || ![SLOT_NOT_AVAILABLE, 'BOOKING_UNAVAILABLE'].includes(error.message)) throw error } } return result }
+export async function getPublicAvailableSlots(input: { clinicPublicSlug: string; date: string }) {
+  const currentClinic = await publicClinic(db, input.clinicPublicSlug)
+  const now = new Date()
+  const latest = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
+  const candidates = publicRange(input.date, currentClinic.timezone, currentClinic.slotIntervalMinutes).flatMap((startsAt) => {
+    const endsAt = new Date(startsAt.getTime() + 30 * 60 * 1000)
+    const withinPublicHours = currentClinic.publicHours.some((hours: { dayOfWeek: number; startTime: string; endTime: string }) => hours.dayOfWeek === weekday(startsAt, currentClinic.timezone) && hours.startTime <= localTime(startsAt, currentClinic.timezone) && hours.endTime >= localTime(endsAt, currentClinic.timezone))
+    return startsAt > now && startsAt <= latest && localDay(endsAt, currentClinic.timezone) === input.date && aligned(startsAt, currentClinic.timezone, currentClinic.slotIntervalMinutes) && aligned(endsAt, currentClinic.timezone, currentClinic.slotIntervalMinutes) && withinPublicHours ? [{ startsAt, endsAt }] : []
+  })
+  if (!candidates.length) return []
+  const scheduled = await db.select({ startsAt: appointment.startsAt, endsAt: appointment.endsAt }).from(appointment).where(and(eq(appointment.organizationId, currentClinic.organizationId), eq(appointment.clinicId, currentClinic.id), lt(appointment.startsAt, candidates[candidates.length - 1].endsAt), gte(appointment.endsAt, candidates[0].startsAt), sql`${appointment.status} not in ('completed', 'cancelled', 'rejected', 'no_show')`))
+  return slotsWithoutConflicts(candidates, scheduled)
+}
 
 function normalizedPhone(value?: string) { const normalized = value?.replace(/\D/g, ''); return normalized || null }
 // A server-resolved account id always wins over a contact match; callers never receive this id from public input.
