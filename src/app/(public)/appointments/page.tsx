@@ -1,10 +1,11 @@
 'use client'
 
 import { Suspense, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { CalendarDays, ClipboardList, MessageCircle, Phone } from 'lucide-react'
 
 import { getAuthenticatedPatientBookingAction } from '#/modules/appointment/server/publicAppointment'
+import { getProfessionalOrderAccessAction } from '#/modules/order/server/generalOrder'
 import PatientAppointmentWizard from './PatientAppointmentWizard'
 import ProfessionalOrderWizard from './ProfessionalOrderWizard'
 
@@ -45,6 +46,7 @@ export default function AppointmentsPage() {
 }
 
 function AppointmentsPageContent() {
+  const router = useRouter()
   const searchParams = useSearchParams()
   const [appointmentType, setAppointmentType] = useState<AppointmentType>(() => searchParams.get('tipo') === 'doctor' ? 'doctor' : null)
   const [existingPatient, setExistingPatient] = useState<boolean | null>(null)
@@ -53,6 +55,14 @@ function AppointmentsPageContent() {
     const account = await getAuthenticatedPatientBookingAction().catch(() => null)
     setAuthenticatedPatient(!!account)
     setAppointmentType('patient')
+  }
+  const chooseProfessional = async () => {
+    const access = await getProfessionalOrderAccessAction().catch(() => ({ authenticated: false, active: false }))
+    if (!access.authenticated) {
+      router.push('/client/login?redirect=%2Fappointments%3Ftipo%3Ddoctor')
+      return
+    }
+    setAppointmentType('doctor')
   }
 
   const choice = (
@@ -69,7 +79,7 @@ function AppointmentsPageContent() {
             <h2 className="mt-8 text-2xl font-semibold tracking-[-0.03em]">Soy paciente</h2>
             <p className="mt-3 max-w-md leading-7 text-muted-foreground">Agenda una cita o un estudio y consulta los horarios disponibles en tu clínica.</p>
           </button>
-          <button type="button" onClick={() => setAppointmentType('doctor')} className="group rounded-2xl border border-primary bg-primary p-6 text-left text-primary-foreground shadow-[0_16px_40px_color-mix(in_srgb,var(--primary)_20%,transparent)] transition-[transform,box-shadow] duration-200 hover:-translate-y-1 hover:shadow-[0_20px_48px_color-mix(in_srgb,var(--primary)_30%,transparent)] active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4 sm:p-8">
+          <button type="button" onClick={() => void chooseProfessional()} className="group rounded-2xl border border-primary bg-primary p-6 text-left text-primary-foreground shadow-[0_16px_40px_color-mix(in_srgb,var(--primary)_20%,transparent)] transition-[transform,box-shadow] duration-200 hover:-translate-y-1 hover:shadow-[0_20px_48px_color-mix(in_srgb,var(--primary)_30%,transparent)] active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4 sm:p-8">
             <span className="flex size-12 items-center justify-center rounded-full bg-primary-foreground/15 text-primary-foreground transition-colors group-hover:bg-primary-foreground group-hover:text-primary"><ClipboardList aria-hidden="true" className="size-6" strokeWidth={1.6} /></span>
             <h2 className="mt-8 text-2xl font-semibold tracking-[-0.03em]">Soy profesional</h2>
             <p className="mt-3 max-w-md leading-7 text-primary-foreground/80">Solicita estudios para tus pacientes y conserva los datos necesarios en un solo proceso.</p>

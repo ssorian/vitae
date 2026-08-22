@@ -1,9 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-
+import { useRouter, useSearchParams } from 'next/navigation'
 import { authClient } from '#/infrastructure/auth/auth-client'
 
 import { Button } from '#/shared/components/ui/button'
@@ -17,9 +16,20 @@ import {
 import { Input } from '#/shared/components/ui/input'
 import { Label } from '#/shared/components/ui/label'
 
-export default function ClientSignUpPage() {
-  const router = useRouter()
+function localRedirect(value: string | null, fallback: string) {
+  return value?.startsWith('/') && !value.startsWith('//') && !value.includes('\\')
+    ? value
+    : fallback
+}
 
+export default function ClientSignUpPage() {
+  return <Suspense fallback={null}><ClientSignUpPageContent /></Suspense>
+}
+
+function ClientSignUpPageContent() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const redirect = localRedirect(searchParams.get('redirect'), '/client/onboarding')
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -60,7 +70,7 @@ export default function ClientSignUpPage() {
       return
     }
 
-    router.replace('/client/onboarding')
+    router.replace(redirect)
     router.refresh()
   }
 
@@ -173,7 +183,7 @@ export default function ClientSignUpPage() {
             <p className="text-center text-sm text-muted-foreground">
               ¿Ya tienes una cuenta?{' '}
               <Link
-                href="/client/login"
+                href={`/client/login?redirect=${encodeURIComponent(redirect)}`}
                 className="font-medium text-primary hover:underline"
               >
                 Iniciar sesión

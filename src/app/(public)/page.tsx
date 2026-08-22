@@ -18,9 +18,9 @@ const images = {
 }
 
 const specialists = [
-  ['Implantología', 'Dra. Elena Santos', 'CEDULA: 8493021', 'Especialista en cirugía oral e implantología avanzada. Pionera en técnicas de regeneración ósea mínimamente invasivas, ofreciendo resultados precisos y naturales.'],
-  ['Ortodoncia', 'Dr. Alejandro Vega', 'CEDULA: 5729103', 'Experto en ortodoncia invisible y diseño de sonrisa digital. Su enfoque se centra en la armonía facial y la funcionalidad a largo plazo mediante tecnología 3D.'],
-  ['Estética Dental', 'Dra. Lucía Navarro', 'CEDULA: 9384712', 'Dedicada a transformar sonrisas con carillas de porcelana ultradelgadas y blanqueamiento clínico. Combina arte y ciencia para lograr una estética dental impecable.'],
+  ['Implantología', 'Dra. Elena Santos', 'CÉDULA: 8493021', 'Especialista en cirugía oral e implantología avanzada. Pionera en técnicas de regeneración ósea mínimamente invasivas, ofreciendo resultados precisos y naturales.'],
+  ['Ortodoncia', 'Dr. Alejandro Vega', 'CÉDULA: 5729103', 'Experto en ortodoncia invisible y diseño de sonrisa digital. Su enfoque se centra en la armonía facial y la funcionalidad a largo plazo mediante tecnología 3D.'],
+  ['Estética Dental', 'Dra. Lucía Navarro', 'CÉDULA: 9384712', 'Dedicada a transformar sonrisas con carillas de porcelana ultradelgadas y blanqueamiento clínico. Combina arte y ciencia para lograr una estética dental impecable.'],
 ]
 
 const reviews = [
@@ -30,35 +30,39 @@ const reviews = [
 ]
 
 const clinics = [
-  ['Vitae Centro', 'Av. Principal 123, Col. Centro, CDMX', 'Lunes a Viernes: 9:00 - 20:00', 'Sábado: 9:00 - 14:00', '+52 (55) 1234-5678'],
-  ['Vitae Norte', 'Circuito Satélite 45, Naucalpan, Edo. Méx.', 'Lunes a Viernes: 10:00 - 19:00', 'Sábado: 10:00 - 15:00', '+52 (55) 8765-4321'],
-  ['Vitae Sur', 'Av. Insurgentes Sur 1580, San Ángel, CDMX', 'Lunes a Viernes: 9:00 - 21:00', 'Sábado: 9:00 - 16:00', '+52 (55) 5555-5555'],
+  ['Vitae Texcaltitlán', 'Texcaltitlán, Estado de México', 'https://maps.app.goo.gl/LgjS2EbP3zUW6y3X9'],
+  ['Vitae Tejupilco', 'Tejupilco, Estado de México', 'https://maps.app.goo.gl/ddxovg1WcKK3e9Sz5'],
 ]
 
-function Cta({ children = 'Book Appointment' }: { children?: React.ReactNode }) {
+const clinicMaps = [
+  ['Vitae Texcaltitlán', '18.9263488,-99.9418646'],
+  ['Vitae Tejupilco', '18.8968218,-100.1449879'],
+]
+
+function Cta({ children = 'Agenda tu cita' }: { children?: React.ReactNode }) {
   return <Link href="/appointments" className="vitae-primary">{children}</Link>
 }
 
 export default function HomePage() {
   return <main className="vitae-landing">
     <section className="vitae-hero">
-      <img src={images.hero} alt="A serene, high-key Vitae dental clinic" className="vitae-hero-image" />
+      <img src={images.hero} alt="Una clínica dental Vitae serena y luminosa" className="vitae-hero-image" />
       <div className="vitae-hero-scrim" />
       <div className="vitae-container vitae-hero-copy">
-        <span className="vitae-rating"><Star size={16} fill="currentColor" />4.9 on Google</span>
+        <span className="vitae-rating"><Star size={16} fill="currentColor" />4.9 en Google</span>
         <h1>Tu sonrisa merece una atención excepcional.</h1>
-        <p>Combining advanced clinical technology with an elevated, serene environment designed for your comfort and wellness.</p>
-        <div className="vitae-actions"><Cta /><a href="#servicios" className="vitae-secondary">Explore Services</a></div>
+        <p>Combinamos tecnología clínica avanzada con un entorno sofisticado y sereno, diseñado para tu comodidad y bienestar.</p>
+        <div className="vitae-actions"><Cta /><a href="#servicios" className="vitae-secondary">Explora los servicios</a></div>
       </div>
     </section>
 
     <section id="servicios" className="vitae-section vitae-container">
       <header className="vitae-centered"><h2>Excelencia en cada tratamiento</h2><p>Descubra nuestro catálogo de servicios dentales de primera clase, diseñados para ofrecer resultados estéticos y funcionales superiores en un entorno sereno y profesional.</p></header>
       <div className="vitae-service-grid">
-        <article className="vitae-service vitae-wide"><img src={images.aligners} alt="Clear orthodontic aligners" /><div><span>Ortodoncia Invisible</span><h3>Alineación Precisa</h3><p>Corrección dental discreta y efectiva utilizando tecnología 3D avanzada. Resultados predecibles sin comprometer su estética durante el proceso.</p><a href="/appointments">Conocer más <ArrowRight size={16} /></a></div></article>
-        <article className="vitae-service"><img src={images.smile} alt="A natural white smile" /><div><span>Estética</span><h3>Carillas de Porcelana</h3><p>Restauraciones ultrafinas diseñadas artesanalmente para perfeccionar la forma, color y simetría de su sonrisa.</p><a href="/appointments">Conocer más <ArrowRight size={16} /></a></div></article>
+        <article className="vitae-service vitae-wide"><img src={images.aligners} alt="Alineadores ortodónticos transparentes" /><div><span>Ortodoncia Invisible</span><h3>Alineación Precisa</h3><p>Corrección dental discreta y efectiva utilizando tecnología 3D avanzada. Resultados predecibles sin comprometer su estética durante el proceso.</p><a href="/appointments">Conocer más <ArrowRight size={16} /></a></div></article>
+        <article className="vitae-service"><img src={images.smile} alt="Una sonrisa blanca y natural" /><div><span>Estética</span><h3>Carillas de Porcelana</h3><p>Restauraciones ultrafinas diseñadas artesanalmente para perfeccionar la forma, color y simetría de su sonrisa.</p><a href="/appointments">Conocer más <ArrowRight size={16} /></a></div></article>
         <article className="vitae-service vitae-copy-service"><div><span>Odontología General</span><h3>Prevención Integral</h3><p>Mantenimiento preventivo, limpiezas profundas y revisiones exhaustivas para asegurar la salud a largo plazo de su ecosistema oral.</p><a href="/appointments">Conocer más <ArrowRight size={16} /></a></div></article>
-        <article className="vitae-service vitae-wide vitae-reverse"><img src={images.implant} alt="Dental implant procedure instruments" /><div><span>Implantología</span><h3>Restauración Estructural</h3><p>Reemplazo de piezas dentales perdidas mediante implantes de titanio biocompatible de última generación, restaurando función y confianza.</p><a href="/appointments">Conocer más <ArrowRight size={16} /></a></div></article>
+        <article className="vitae-service vitae-wide vitae-reverse"><img src={images.implant} alt="Instrumentos para un procedimiento de implante dental" /><div><span>Implantología</span><h3>Restauración Estructural</h3><p>Reemplazo de piezas dentales perdidas mediante implantes de titanio biocompatible de última generación, restaurando función y confianza.</p><a href="/appointments">Conocer más <ArrowRight size={16} /></a></div></article>
         <article className="vitae-service"><img src={images.radiography} alt="Radiografía dental panorámica" /><div><span>Estudios</span><h3>Radiografía Dental</h3><p>Imágenes diagnósticas para evaluar piezas dentales, raíces y estructuras de soporte con claridad.</p><a href="/appointments">Solicitar estudio <ArrowRight size={16} /></a></div></article>
         <article className="vitae-service"><img src={images.radiography2d} alt="Película de radiografía dental 2D" /><div><span>Estudios</span><h3>Radiografía 2D</h3><p>Estudios panorámicos y laterales para apoyar la valoración clínica y la planificación del tratamiento.</p><a href="/appointments">Solicitar estudio <ArrowRight size={16} /></a></div></article>
         <article className="vitae-service vitae-copy-service"><div><span>Estudios</span><h3>Escaneo Intraoral</h3><p>Registro digital en formato STL para ortodoncia, restauraciones y modelos sin impresiones convencionales.</p><a href="/appointments">Solicitar estudio <ArrowRight size={16} /></a></div></article>
@@ -73,7 +77,7 @@ export default function HomePage() {
 
     <section id="especialistas" className="vitae-section vitae-container">
       <header className="vitae-centered"><h2>Liderando la innovación dental</h2><p>Conoce a nuestro equipo de especialistas altamente cualificados, dedicados a brindar una atención excepcional y personalizada en un entorno de vanguardia.</p></header>
-      <div className="vitae-specialists">{specialists.map(([type, name, license, description], index) => <article key={name} className="vitae-specialist"><img src={images.specialists[index]} alt={`Portrait of ${name}`} /><div><span>{type}</span><h3>{name}</h3><small>{license}</small><p>{description}</p><Cta>Agendar Cita</Cta></div></article>)}</div>
+      <div className="vitae-specialists">{specialists.map(([type, name, license, description], index) => <article key={name} className="vitae-specialist"><img src={images.specialists[index]} alt={`Retrato de ${name}`} /><div><span>{type}</span><h3>{name}</h3><small>{license}</small><p>{description}</p><Cta>Agendar Cita</Cta></div></article>)}</div>
     </section>
 
     <section id="reviews" className="vitae-section vitae-container">
@@ -81,8 +85,8 @@ export default function HomePage() {
       <div className="vitae-reviews">{reviews.map(([when, quote, name, service]) => <article key={name}><div><span className="vitae-stars">★★★★★</span><small>{when}</small></div><blockquote>{quote}</blockquote><p><b>{name}</b><br /><small>{service}</small></p></article>)}</div>
     </section>
 
-    <section id="ubicaciones" className="vitae-locations"><div className="vitae-container"><header><h2>Nuestras Sedes</h2><p>Encuentra la clínica Vitae más cercana a ti. Diseñadas como santuarios de bienestar para tu salud dental.</p></header><div className="vitae-locations-grid"><div className="vitae-clinics">{clinics.map(([name, address, weekday, saturday, phone], index) => <article key={name}>{index === 2 && <em>Nuevo</em>}<h3>{name}</h3><p><MapPin size={18}/>{address}</p><small><Clock3 size={17}/>{weekday}<br />{saturday}<br />{phone}</small><div><Cta>Agendar Cita</Cta><a target="_blank" rel="noreferrer" href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`}>Cómo llegar</a></div></article>)}</div><div className="vitae-map"><img src={images.map} alt="Map of Mexico City clinic locations" /><i className="pin-one"><MapPin fill="currentColor" /></i><i className="pin-two"><MapPin fill="currentColor" /></i><i className="pin-three"><MapPin fill="currentColor" /></i></div></div></div></section>
+    <section id="ubicaciones" className="vitae-locations"><div className="vitae-container"><header><h2>Nuestras Sedes</h2><p>Encuentra la clínica Vitae más cercana a ti. Diseñadas como santuarios de bienestar para tu salud dental.</p></header><div className="vitae-locations-grid"><div className="vitae-clinics">{clinics.map(([name, address, mapsUrl]) => <article key={name}><h3>{name}</h3><p><MapPin size={18}/>{address}</p><small><Clock3 size={17}/>Consulta horarios y detalles en Google Maps.</small><div><Cta>Agendar Cita</Cta><a target="_blank" rel="noreferrer" href={mapsUrl}>Cómo llegar</a></div></article>)}<article><em>Próximamente</em><h3>Nueva sede</h3><p><MapPin size={18}/>Ubicación por definir</p><small>Muy pronto compartiremos más información.</small></article></div><div className="vitae-map">{clinicMaps.map(([name, coordinates]) => <iframe key={name} title={`Mapa de ${name}`} src={`https://www.google.com/maps?q=${coordinates}&z=16&output=embed`} loading="lazy" referrerPolicy="no-referrer-when-downgrade" />)}</div></div></div></section>
 
-    <section id="contacto" className="vitae-final"><div><h2>Tu próxima sonrisa empieza aquí.</h2><p>Experience the Vitae difference. Schedule your comprehensive evaluation today.</p><Cta>Book Your Appointment</Cta></div></section>
+    <section id="contacto" className="vitae-final"><div><h2>Tu próxima sonrisa empieza aquí.</h2><p>Vive la diferencia Vitae. Agenda hoy tu valoración integral.</p><Cta>Agenda tu cita</Cta></div></section>
   </main>
 }
